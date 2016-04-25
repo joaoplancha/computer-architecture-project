@@ -31,12 +31,17 @@ ciesq	EQU	0H
 cidir	EQU	2H
 baesq	EQU	8H
 badir	EQU	0AH
-restrt	EQU	0CH
+rstrt	EQU	0CH
 ;
 ; **********************************************************************
 ; Desenhos
 base	 	EQU	8000H	; endereço do inicio do pixelScreen
 topo		EQU	8080H	; endereço do fim do pixelScreen
+mask_linha	EQU	0FFFFH	
+mask_colE	EQU	8000H
+mask_colD	EQU	0001H
+caixa_lin	EQU	0CH
+caixa_col	EQU	0DH
 ; **********************************************************************
 ; * Stack 
 ; **********************************************************************
@@ -55,10 +60,15 @@ mascaras:	STRING	80H,40H,20H,10H,08H,04H,02H,01H
 pac		:	STRING	7H,4H,7H	; desenho do pacman				
 fant	: 	STRING	5H,2H,5H	; desenho do fantasma
 obj		:	STRING 	2H,7H,2H	; desenho do objecto
-nc_des		EQU	3H				; n colunas que o desenho tem
-nl_des		EQU	3H				; n linhas que o desenho tem
+caixa	:	STRING	63H,41H,41H,41H,41H,41H,7FH
+nlin	:	WORD	3H
+ncol	:	WORD	3H
+nlin_def	EQU	3H
+ncol_def	EQU	3H
+nlin_cx		EQU	7H
+ncol_cx		EQU	7H
 pac_ini_L	EQU 1AH				; linha inicial do pacman
-pac_ini_C	EQU 0EH				; coluna inicial do pacman
+pac_ini_C	EQU 0DH				; coluna inicial do pacman
 obj_L1		EQU	1H
 obj_L2		EQU	1CH
 obj_C1		EQU	2H
@@ -71,6 +81,7 @@ OFF			EQU	0H
 keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
 keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
+des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
 
 ; **********************************************************************
 ; Tabela de vectores de interrupção
@@ -84,6 +95,9 @@ PLACE		0H
 init:
 	; limpa ecra
 	CALL	limpa
+	CALL	desenha_ecra; desenha as barreiras
+	
+
 	; desenha o pacman na posicao inicial: 
 	MOV		R1,pac_ini_L;
 	MOV		R2,pac_ini_C;
@@ -236,8 +250,10 @@ pacman:
 	PUSH	R0
 	PUSH	R3
 	PUSH	R5
+	PUSH	R7
 	
-	;verificacao se o teclado esta ON ou OFF
+	; CONDICOES A VERIFICAR PARA MOVER PACMAN
+	; verificacao se o teclado esta ON ou OFF
 	MOV		R3,keyb_stt
 	MOV		R5,[R3]
 	CMP		R5,OFF
@@ -247,101 +263,124 @@ pacman:
 	CMP		R9,R3		
 	JZ		sai_pac		; sai da rotina sem fazer nada
 	
+	; verificacao do estado do pacman
+	; encostado à esquerda = 1000 0000
+	; encostado à direita = 0001 0000
+	; encostado acima = 0000 1000
+	; encostado abaixo = 0000 0001
+	; por implementar
+	
+	; TODAS AS CONDICOES VERIFICADAS, PODEMOS MOVER O PACMAN
+	MOV		R7,0		; serve para controlar variavel de estado a limp
 	MOV		R8,pac
+
+						; movimento para cima
 	MOV		R0,cima
 	CMP		R9,R0
 	JZ		mov_cima
+						; movimento para baixo
 	MOV		R0,baixo
 	CMP		R9,R0
 	JZ		mov_baixo
+						; movimento para a esquerda
 	MOV		R0,dir
 	CMP		R9,R0
 	JZ		mov_dir
+						; movimento para a direita
 	MOV		R0,esq
 	CMP		R9,R0
 	JZ		mov_esq
+						; movimento para cima e esquerda
 	MOV		R0,ciesq
 	CMP		R9,R0
 	JZ		mov_ciesq
+						; movimento para cima e direita
 	MOV		R0,cidir
 	CMP		R9,R0
 	JZ		mov_cidir
+						; movimento para baixo e esquerda
 	MOV		R0,baesq
 	CMP		R9,R0
 	JZ		mov_baesq
+						; movimento para baixo e direita
 	MOV		R0,badir
 	CMP		R9,R0
 	JZ		mov_badir
+	
 	JMP 	sai_pac
+
 mov_cima:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	SUB 	R1,1
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
+	CALL	go
 	JMP		sai_pac	
 mov_baixo:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	ADD 	R1,1
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
+	CALL	go
 	JMP		sai_pac	
 mov_dir:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	ADD 	R2,1
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
+	CALL	go
 	JMP		sai_pac	
 mov_esq:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	SUB 	R2,1
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
+	CALL	go
 	JMP		sai_pac
 mov_ciesq:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	SUB		R1,1
 	SUB 	R2,1
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
+	CALL	go
 	JMP		sai_pac
 mov_cidir:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	SUB 	R1,1
 	ADD		R2,1
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
+	CALL	go
 	JMP		sai_pac
 mov_baesq:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	ADD 	R1,1
 	SUB		R2,1
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
+	CALL	go
 	JMP		sai_pac
 mov_badir:
-	CALL	limpa_des
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
+	CALL	desenha		; limpa o desenho actual
 	ADD		R1,1
 	ADD 	R2,1
+	CALL	go
+	JMP		sai_pac
+go:	
+	MOV		R7,1		; server para por a variavel de estado a desenh
+	MOV		R0,des_limp
+	MOV		[R0],R7		; poe a variavel de controle do desenha a desenh
 	CALL 	desenha
 	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
 	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
 	MOV		[R3],R5
-	JMP		sai_pac
+	RET
+	
 sai_pac:
+	POP		R7
 	POP		R5
 	POP		R3
 	POP		R0
@@ -356,7 +395,13 @@ sai_fant:
 ; **********************************************************************
 ; CONTROLO	
 controlo:
-
+	; restart?
+	MOV		R0,rstrt
+	CMP		R9,R0
+	JNZ		sai_ctrl
+	MOV		SP,fim_pilha; incializa SP
+	MOV		R9,ES0_tec	; Coloca teclado no estado 0
+	JMP		init
 sai_ctrl:
 	RET
 
@@ -412,16 +457,18 @@ desenha:
 	PUSH	R9
 	PUSH	R10
 ;INICIALIZACOES
-	MOV		R0,base		; R0: endereco de base do pixelscreen
-	MOV		R4,4		; Inicializacao de valores usados em acende
-	MOV		R5,8		; Inicializacao de valores usados em acende
 
 	MOV 	R3,R2		; Coluna auxiliar - R2 vai ser destruido
+	MOV		R6,nlin
+	MOV		R4,[R6]		; R4 - N linhas do desenho
+	MOV		R6,ncol
+	MOV		R5,[R6]		; R5 - N colunas do desenho
+	MOV		R10,8		; para ir para o fim da tabela de mascaras
 
 ;DECISAO DO PIXEL A ACENDER
 	MOV 	R6,mascaras	; R6: ponteiro para o primeiro byte de mascaras
-	ADD		R6,R5		; Vai para o fim da tabela de mascaras (R5=8)
-	SUB		R6,nc_des	; Subtrai o numero de colunas do desenho
+	ADD		R6,R10		; Vai para o fim da tabela de mascaras (R5=8)
+	SUB		R6,R5		; Subtrai o numero de colunas do desenho
 						; para ficar a apontar para a posicao certa
 	MOVB 	R7,[R6]		; R7: primeiro valor de mascara
 	MOVB 	R9,[R8]		; R9: primeira linha do desenho
@@ -435,7 +482,7 @@ nxt_lin:
 	MOVB 	R7,[R6]		; R7: Reinicia o valor da mascara
 	ADD		R1,1		; R1: Adiciona um ao valor da linha
 	ADD		R10,1		; R10: Adiciona um ao contador de linha
-	CMP		R10,nl_des	; Ja passou da ultima linha do desenho?
+	CMP		R10,R4		; Ja passou da ultima linha do desenho?
 	JZ		sai_des 	; Se ja passou da ultima linha, vai para fim
 						; Se nao, continua para o ckeckbit
 
@@ -474,47 +521,6 @@ sai_des:
 ; R1 e R2 variam entre 0 e 31.
 acende:					
 	;pushs
-	PUSH	R1
-	PUSH	R2
-	PUSH	R3
-	PUSH	R6
-	PUSH	R7
-	PUSH	R8
-	MOV 	R3,R2		; Guarda a coluna em R3 (R2 vai ser destruido)					
-	;formula para endereco
-	DIV		R2,R5
-	MUL		R1,R4
-	ADD		R1,R0
-	ADD		R1,R2		; Endereço guardado em R1
-	;formula para valor
-	MOD		R3,R5		; Valor guardado em R3. 
-						; R3: offset a somar a base de mascaras						
-	;busca mascara de acordo com valor calculado acima	
-	MOV		R6,mascaras	; R6: inicio da tabela de mascaras
-	ADD		R6,R3		; R6: endereco da mascara a usar
-	MOVB	R7,[R6]		; R7: mascara a usar. Tem info do bit que 
-						; queremos acender dentro de um certo byte
-	;acende pixel
-	MOVB	R8,[R1]		; Vai buscar os bits que ja estao acesos
-	OR		R7,R8		; Junta o anterior ao bit que queremos acender
-	MOVB	[R1],R7		;acende o bit em questao, deixando inalterado os
-						; bits ja acesos dentro do byte	
-	;pops
-	POP		R8
-	POP		R7
-	POP		R6
-	POP		R3
-	POP		R2
-	POP		R1
-	RET
-
-; **********************************************************************
-; LIMPA DESENHO
-; Recebe a localizacao do desenho (canto superior esquerdo)
-; em R1, R2 (linha, coluna)
-; em R8 recebe o desenho
-; nao retorna nada
-limpa_des:
 	PUSH	R0
 	PUSH	R1
 	PUSH	R2
@@ -524,77 +530,9 @@ limpa_des:
 	PUSH	R6
 	PUSH	R7
 	PUSH	R8
-	PUSH	R9
-	PUSH	R10
-;INICIALIZACOES
 	MOV		R0,base		; R0: endereco de base do pixelscreen
 	MOV		R4,4		; Inicializacao de valores usados em acende
 	MOV		R5,8		; Inicializacao de valores usados em acende
-
-	MOV 	R3,R2		; Coluna auxiliar - R2 vai ser destruido
-
-;DECISAO DO PIXEL A ACENDER
-	MOV 	R6,mascaras	; R6: ponteiro para o primeiro byte de mascaras
-	ADD		R6,R5		; Vai para o fim da tabela de mascaras (R5=8)
-	SUB		R6,nc_des	; Subtrai o numero de colunas do desenho
-						; para ficar a apontar para a posicao certa
-	MOVB 	R7,[R6]		; R7: primeiro valor de mascara
-	MOVB 	R9,[R8]		; R9: primeira linha do desenho
-	MOV 	R10,0		; R10: contador de linhas a desenhar
-	JMP		checkbit2	; Inicia o varrimento no checkbit
-	
-nxt_lin2:		
-	MOV 	R2,R3		; R2: Repoe o valor original de coluna
-	ADD		R8,1 		; R8: Passa a linha seguinte do desenho
-	MOVB	R9,[R8] 	; R9: Proxima linha do desenho
-	MOVB 	R7,[R6]		; R7: Reinicia o valor da mascara
-	ADD		R1,1		; R1: Adiciona um ao valor da linha
-	ADD		R10,1		; R10: Adiciona um ao contador de linha
-	CMP		R10,nl_des	; Ja passou da ultima linha do desenho?
-	JZ		sai_des2 	; Se ja passou da ultima linha, vai para fim
-						; Se nao, continua para o ckeckbit
-
-checkbit2:	
-	AND 	R9,R7		; Verifica se ha bits comuns (a 1) entre a 
-						; mascara escolhida e a linha do desenho
-	JZ		nxt_col2 	; Se nao houver, salta para nxt_col
-	CALL 	apaga 		; Se houver um bit comum (a 1) chama rotina que 
-						; vai acender o pixel respectivo no ecra
-
-nxt_col2:		
-	MOVB 	R9,[R8]		; Repoe o valor da primeira linha do pacman que 
-						; tinha sido destruido pelo AND
-	SHR		R7,1		; Passa para a mascara seguinte (de mascaras)
-	JZ 		nxt_lin2 	; Quando o SHR anterior passa de 0001 a 0000, 
-						; nao tem mais colunas e salta para a prox. lin.
-	ADD		R2,1 		; Caso contrario, adciona um ao valor da coluna
-	JMP		checkbit2 	; Volta para o checkbit, com a mascara para a 
-						; coluna seguinte ja preparada (devido ao SHR)
-						
-sai_des2:		
-	POP		R10
-	POP		R9
-	POP		R8
-	POP		R7
-	POP		R6
-	POP		R5
-	POP		R4
-	POP		R3
-	POP		R2
-	POP		R1
-	POP		R0
-	RET 	
-	
-; ROTINA APAGA PIXEL -- Chamada com R1 = linha e R2 = coluna. 
-; R1 e R2 variam entre 0 e 31.
-apaga:					
-	;pushs
-	PUSH	R1
-	PUSH	R2
-	PUSH	R3
-	PUSH	R6
-	PUSH	R7
-	PUSH	R8
 	MOV 	R3,R2		; Guarda a coluna em R3 (R2 vai ser destruido)					
 	;formula para endereco
 	DIV		R2,R5
@@ -609,16 +547,111 @@ apaga:
 	ADD		R6,R3		; R6: endereco da mascara a usar
 	MOVB	R7,[R6]		; R7: mascara a usar. Tem info do bit que 
 						; queremos acender dentro de um certo byte
-	;apaga pixel
+	
+	MOV		R0,des_limp
+	MOV		R3,[R0]		; vai ver o que tem na variavel de estado do des 
+	CMP		R3,0		; se for zero, esta no modo apagar
+	JZ		apaga_pixel	; salta para apaga pixel. caso contrario segue
+acende_pixel:
+	MOVB	R8,[R1]		; Vai buscar os bits que ja estao acesos
+	OR		R7,R8		; Junta o anterior ao bit que queremos acender
+	MOVB	[R1],R7		;acende o bit em questao, deixando inalterado os
+						; bits ja acesos dentro do byte	
+	JMP 	pops
+apaga_pixel:			
 	MOVB	R8,[R1]		; Vai buscar os bits que ja estao acesos
 	SUB		R8,R7
 	MOVB	[R1],R8		;acende o bit em questao, deixando inalterado os
-						; bits ja acesos dentro do byte	
+						; bits ja acesos dentro do byte		
 	;pops
+pops:
 	POP		R8
 	POP		R7
 	POP		R6
+	POP		R5
+	POP		R4
 	POP		R3
 	POP		R2
 	POP		R1
+	POP		R0
+	RET
+	
+; **********************************************************************
+; DESENHA ECRA
+; Nao recebe nem retorna argumentos
+; Desenha as barreiras do ecra e a caixa central
+desenha_ecra:	
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R8
+	
+	; desenha barreiras
+	; desenha barreira superior e inferior
+	MOV		R0,base		; inicio da linha superior
+	MOV		R3,mask_linha	
+	MOV		[R0],R3		; Coloca a linha superior a 1 (metade)
+	MOV		[R0+2],R3	; Coloca a linha superior a 1 (metade)
+	MOV		R0,topo		; fim de linha inferior
+	MOV		R3,mask_linha	
+	MOV		[R0-2],R3	; Coloca a linha inferior a 1 (metade)
+	MOV		[R0-4],R3	; Coloca a linha inferior a 1 (metade)
+	
+	; desenha barreiras laterais
+	; esquerda
+	MOV		R0,base	
+	ADD		R0,4	 	; comeca aqui, canto superior esquerdo
+	MOV		R4,topo		;
+	SUB		R4,4		; acaba aqui, canto inferior esquerdo
+	MOV		R3,mask_colE;
+b_e:
+	MOV		[R0],R3		; acende pixel a 1 na extremidade
+	ADD		R0,4		; passa a linha seguinte
+	CMP		R0,R4		; ja chegou ao fim?
+	JNZ		b_e			; se nao, volta a iterar
+	; direita
+	MOV		R0,base	
+	ADD		R0,6	 	; comeca aqui, canto superior direito
+	MOV		R4,topo		;
+	SUB		R4,2		; acaba aqui, canto inferior direito
+	MOV		R3,mask_colD;
+b_d:
+	MOV		[R0],R3		; acende pixel a 1 na extremidade
+	ADD		R0,4		; passa a linha seguinte
+	CMP		R0,R4		; ja chegou ao fim?
+	JNZ		b_d			; se nao, volta a iterar
+	
+	; desenha caixa central de onde saem os fantasmas
+	; coloca as dimensoes linha e coluna da caixa
+	MOV		R5,nlin
+	MOV		R6,nlin_cx
+	MOV		[R5],R6
+	MOV		R5,ncol
+	MOV		R6,ncol_cx
+	MOV		[R5],R6
+		
+	MOV		R1,caixa_lin
+	MOV		R2,caixa_col
+	MOV		R8,caixa
+	CALL 	desenha
+	
+	MOV		R5,nlin
+	MOV		R6,nlin_def
+	MOV		[R5],R6
+	MOV		R5,ncol
+	MOV		R6,ncol_def
+	MOV		[R5],R6
+	
+	POP		R8
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
 	RET
