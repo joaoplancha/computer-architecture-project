@@ -41,13 +41,13 @@ topo		EQU	8080H	; endereço do fim do pixelScreen
 ; * Stack 
 ; **********************************************************************
 PLACE		2000H
-pilha:		TABLE 100H		; espaço reservado para a pilha 
+pilha:		TABLE 200H		; espaço reservado para a pilha 
 fim_pilha:				
 
 ; **********************************************************************
 ; * Dados
 ; **********************************************************************
-PLACE		2200H
+PLACE		2400H
 ; tabela de mascaras a usar pela rotina shape_draw:
 ; desenhos podem ser modificados
 ; tamanho maximo: 7x7
@@ -63,6 +63,15 @@ obj_L1		EQU	1H
 obj_L2		EQU	1CH
 obj_C1		EQU	2H
 obj_C2		EQU	1BH
+
+PLACE		2600H
+; variaveis
+ON			EQU	1H
+OFF			EQU	0H
+keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
+keyb_lin:	WORD	1H
+keyb_col:	WORD	1H
+
 ; **********************************************************************
 ; Tabela de vectores de interrupção
 ;tab:		WORD	sig0
@@ -80,6 +89,7 @@ init:
 	MOV		R2,pac_ini_C;
 	MOV		R8,pac		;
 	CALL	desenha		;
+	
 	; desenha os objectos na posicao inicial:
 	PUSH	R1
 	PUSH	R2
@@ -128,25 +138,35 @@ teclado:
 	PUSH	R7
 	PUSH	R8
 	PUSH	R10
-	MOV		R2,PIN		; R2: endereco de saida do teclado
-	MOV		R1,ES0_tec
-	CMP		R9,R1		; Verifica se esta no estado zero
-	JZ		inicio		; Se esta, inicia o varrimento
-show_key:				; Caso contrario significa que uma tecla foi 
-						; premida. Verifiquemos se continua premida:
-	MOVB 	R3,[R2]		; Ler do porto de entrada (saida do tecl.)
-						; regista se alguma tecla esta a ser premida
-	AND 	R3,R3		; Afecta as flags (MOVs não afectam as flags)
-	JNZ 	sai_tec		; Tecla continua premida, sai da rotina 
-	MOV 	R9,ES0_tec	; Quando a deixar de estar premida, poe R9 no E0
-	MOV		R0,0
-	JMP		sai_tec		; Sai da rotina
-; inicia o varrimento
 inicio:					; Inicializações gerais
 	MOV		R2,PIN		; R2: endereco de saida do teclado
 	MOV		R10,POUT2	; R10: endereco de entrada do teclado
 	MOV		R6,MASK		; R6: guarda a mascara 10H
 	MOV		R4,4		; Valor usado para calculo no ciclo conv_key
+	
+	MOV		R3,keyb_stt	; Busca o apontador para o estado do teclado
+	MOV		R5,[R3]		; R5 = Estado do teclado (1-ON, 0-OFF)
+	CMP		R5,OFF		; Se estiver OFF
+	JZ		update_keyb	; Verifica se a tecla ja foi largada
+	CMP		R5,ON		; Se estiver ON
+	JZ		frst_line 	; Faz o varrimento normal do teclado
+update_keyb:
+	MOV		R9,ES0_tec	; R9: estado 0 - 00FFH
+	MOV		R3,keyb_lin
+	MOV		R1,[R3]		; Vai buscar a linha de onde leu e guardou
+	MOVB 	[R10],R1	; Escrever no porto de saída (entrada do tecl.)
+						; indica ao teclado a linha a ver	
+	MOV		R3,keyb_col
+	MOV		R5,[R3]		; Vai buscar a coluna de onde leu e guardou
+	MOVB 	R3,[R2]		; Ler do porto de entrada (saida do tecl.)
+						; regista se alguma tecla esta a ser premida
+	CMP 	R5,R3		; Compara o que leu com o que esta a ler agora
+	JZ 		sai_tec		; Tecla continua premida, sai sem fazer update 
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,ON		; Faz o update do estado do teclado para ON
+	MOV		[R3],R5
+	JMP 	sai_tec		; Sai da rotina do teclado
+; inicia o varrimento
 frst_line:				; Inicio do varrimento pela linha 1
 	MOV		R1,LINHA	; Comeca/volta a linha 1 do teclado
 						; R1: valor da linha do telcado em que estamos
@@ -165,6 +185,12 @@ chk_pressed:			; Verifica se alguma tecla da linha foi premida
 						; regista se alguma tecla foi premida
 	AND 	R3,R3		; Afectar as flags (MOVs não afectam as flags)
 	JZ 		nxt_line	; Nenhuma tecla premida, passar a linha seguinte
+	
+	MOV		R7,keyb_lin
+	MOV 	[R7],R1		; guarda linha na memoria
+	MOV		R7,keyb_col
+	MOV 	[R7],R3		; guarda coluna na memoria
+	
 	MOV		R7,R1		; Tecla premida - guarda o valor da linha 
 						; (1,2,4 ou 8) no registo R7
 	SHL		R7,8		; Empurra o valor da linha para o byte mais 
@@ -207,8 +233,21 @@ sai_tec:
 ; **********************************************************************
 ; PACMAN
 pacman:
-	MOV		R8,pac
 	PUSH	R0
+	PUSH	R3
+	PUSH	R5
+	
+	;verificacao se o teclado esta ON ou OFF
+	MOV		R3,keyb_stt
+	MOV		R5,[R3]
+	CMP		R5,OFF
+	JZ		sai_pac		; Se estiver OFF, nao faz nada e sai da rotina
+	
+	MOV		R3,ES0_tec	; Se estiver ON, mas R9 estiver no estado 0
+	CMP		R9,R3		
+	JZ		sai_pac		; sai da rotina sem fazer nada
+	
+	MOV		R8,pac
 	MOV		R0,cima
 	CMP		R9,R0
 	JZ		mov_cima
@@ -238,47 +277,73 @@ mov_cima:
 	CALL	limpa_des
 	SUB 	R1,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac	
 mov_baixo:
 	CALL	limpa_des
 	ADD 	R1,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac	
 mov_dir:
 	CALL	limpa_des
 	ADD 	R2,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac	
 mov_esq:
 	CALL	limpa_des
 	SUB 	R2,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac
 mov_ciesq:
 	CALL	limpa_des
 	SUB		R1,1
 	SUB 	R2,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac
 mov_cidir:
 	CALL	limpa_des
 	SUB 	R1,1
 	ADD		R2,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac
 mov_baesq:
 	CALL	limpa_des
 	ADD 	R1,1
 	SUB		R2,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac
 mov_badir:
 	CALL	limpa_des
 	ADD		R1,1
 	ADD 	R2,1
 	CALL 	desenha
+	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
+	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
+	MOV		[R3],R5
 	JMP		sai_pac
 sai_pac:
+	POP		R5
+	POP		R3
 	POP		R0
 	RET
 ; **********************************************************************
