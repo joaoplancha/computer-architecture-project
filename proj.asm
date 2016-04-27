@@ -120,6 +120,9 @@ fant_pos	:	WORD 	0D0FH
 ; posicao de 1 fantasma em cada posicao da tabela
 ; a posicao inicial e a mesma para todos
 
+call_fant	:	WORD	0H	; variavel de chamada da interrupcao
+							; 1 executa, 0 nao executa
+
 fant_dorme		EQU		0H
 fant_acorda		EQU		1H
 fant_caixa		EQU		5H 	; 2, 3, 4, 5, esta na caixa
@@ -135,11 +138,13 @@ des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
 
 ; **********************************************************************
 ; Tabela de vectores de interrupção
-;tab:		WORD	sig0
-;			WORD	sig1
+tab:		WORD	sig0
+			;WORD	sig1
+
 
 PLACE		0H	
 	MOV		SP,fim_pilha; incializa SP
+	MOV	BTE, tab		; incializa BTE
 	MOV		R9,ES0_tec	; Coloca teclado no estado 0
 
 init:
@@ -175,6 +180,8 @@ init:
 	CALL	desenha		;
 	POP	R2
 	POP R1
+	EI0
+	EI
 	
 ciclo:
 	CALL	teclado		; Varrimento e leitura das teclas
@@ -403,6 +410,12 @@ fantasmas:
 	PUSH	R9
 	PUSH	R10
 	
+	MOV		R0,call_fant
+	MOV		R10,[R0]
+	MOV		R3,0
+	CMP		R10,R3
+	JZ		sai_fant
+	
 	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
 	MOVB 	R3,[R0]			; R3 = Estado do fantasma
 	MOV 	R4,fant_pos		; R4 = Apontador para posicao do fantasma
@@ -440,7 +453,7 @@ acorda_fant:
 	
 	ADD		R3,1
 	MOVB 	[R0],R3			; actualiza o estado do fantasma
-	JMP		sai_fant 		;
+	JMP		rst_fant 		;
 
 saicx_fant:
 
@@ -476,11 +489,11 @@ saicx_fant:
 	MOVB 	[R0],R3			; actualiza o estado do fantasma
 	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
 	JGT		avisa			; se ja saiu da caixa
-	JMP		sai_fant 		;
+	JMP		rst_fant 		;
 
 avisa:
 ;	MOV						; avisa que outro fantasma pode ser acordado
-	JMP		sai_fant
+	JMP		rst_fant
 
 
 move_fant:
@@ -556,8 +569,14 @@ out:
 	POP		R2
 	POP		R1
 	POP		R0
-	
-	JMP		sai_fant 		;
+	JMP		rst_fant 		;
+
+
+rst_fant:
+	MOV		R0,call_fant
+	MOV		R3,0
+	MOV		[R0],R3
+	JMP		sai_fant
 
 sai_fant:
 	POP		R10
@@ -834,3 +853,20 @@ b_d:
 	POP		R1
 	POP		R0
 	RET
+
+; **********************************************************************
+; **********************************************************************
+; ROTINAS DE INTERRUPCAO
+; **********************************************************************
+; **********************************************************************
+; sig0: move fantasma
+
+sig0:
+	PUSH	R0
+	PUSH	R3
+	MOV		R0,call_fant
+	MOV		R3,1
+	MOV		[R0],R3
+	POP		R3
+	POP		R0
+	RFE
