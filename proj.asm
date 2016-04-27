@@ -91,6 +91,7 @@ nlin_cx		EQU	7H				; numero de linhas da caixa
 ncol_cx		EQU	7H				; numero de colunas da caixa
 pac_ini_L	EQU 1AH				; linha inicial do pacman
 pac_ini_C	EQU 0DH				; coluna inicial do pacman
+
 ; linhas e colunas dos objectos
 obj_L1		EQU	1H			
 obj_L2		EQU	1CH
@@ -405,6 +406,11 @@ fantasmas:
 	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
 	MOVB 	R3,[R0]			; R3 = Estado do fantasma
 	MOV 	R4,fant_pos		; R4 = Apontador para posicao do fantasma
+	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
+	ADD		R4,1			; passa a coluna
+	MOVB	R6,[R4]			; R6 = coluna actual do fantasma
+	SUB		R4,1			; volta ao apontador original
+
 
 	; IFs
 	CMP		R3,fant_dorme	; Se estiver nao inicializado
@@ -414,7 +420,7 @@ fantasmas:
 	JZ		acorda_fant		; vai acordar o fantasma
 							; se nao for 0 ou 1, vamos ver se esta na caixa
 	CMP		R3,fant_caixa	; Se estiver dentro da caixa
-	JLE		saicx_fant		; 2-4 vai mover-se para cima, 5 sai da caixa
+	JLE		saicx_fant		; 2-5 vai mover-se para cima, 6 sai da caixa
 
 	CMP		R3,fant_jogo	; Se estiver fora da caixa, esta em jogo
 	JZ		move_fant		; vai mover-se na direccao do pacman
@@ -437,10 +443,6 @@ acorda_fant:
 	JMP		sai_fant 		;
 
 saicx_fant:
-	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
-	ADD		R4,1			; passa a coluna
-	MOVB	R6,[R4]			; R6 = coluna actual do fantasma
-	SUB		R4,1			; volta ao apontador original
 
 	PUSH	R0
 	PUSH	R1				; preservar linha e coluna do pacman nos
@@ -478,23 +480,55 @@ saicx_fant:
 
 avisa:
 ;	MOV						; avisa que outro fantasma pode ser acordado
-;	JMP
+	JMP		sai_fant
 
 
 move_fant:
-	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
-	MOV		R3,R5			; R3 preserva a linha do fantasma
-	ADD		R4,1			; vai para coluna
-	MOVB	R6,[R4]			; R6 = coluna actual do fantasma
-	MOV		R7,R6			; preserva a coluna do fantasma
-	SUB 	R5,R1 		; diferenca entre linha do fantasma e do pacman
-	SUB 	R6,R2		; diferenca entre coluna do fantasma e do pacman
 	
 	PUSH	R0
 	PUSH	R1				; preservar linha e coluna do pacman nos
 	PUSH	R2				; registos R1 e R2
-	MOV		R1,R3
-	MOV		R2,R7
+	PUSH	R3
+	PUSH	R5
+	PUSH	R6
+
+calc_linha:
+	CMP 	R1,R5 		; diferenca entre linha do fantasma e do pacman
+	JZ		msm_linha
+	JN		neg_linha
+	JMP		pos_linha
+msm_linha:
+	MOV		R1,0
+	JMP		calc_col
+neg_linha:
+	MOV		R1,-1
+	JMP		calc_col
+pos_linha:
+	MOV		R1,1
+	JMP		calc_col
+	
+calc_col:
+	CMP 	R2,R6		; diferenca entre coluna do fantasma e do pacman
+	JZ		msm_col
+	JN		neg_col
+	JMP		pos_col
+msm_col:
+	MOV		R2,0
+	JMP		out
+neg_col:
+	MOV		R2,-1
+	JMP		out
+pos_col:
+	MOV		R2,1
+	JMP		out
+	
+	; neste ponto R1 e R2 contem o que e preciso somar a R5 e R6 para
+	; mover o fantasma. vamos trocar R1 com R5 e R2 com R6 para usarmos 
+	; os registos R1 e R2 para a rotina de desenho.
+
+out:
+	SWAP	R1,R5
+	SWAP	R2,R6
 	MOV		R7,0			; serve para controlar variavel de estado 
 							; que controla o limpa ou o desenho
 	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
@@ -515,7 +549,10 @@ move_fant:
 	
 	SHL		R1,8
 	ADD		R1,R2
-	MOV		[R4],R1			; coloca a nova pos. do fantasma em memoria
+	MOV		[R4],R1		; coloca a nova pos. do fantasma em memoria
+	POP		R6
+	POP		R5
+	POP		R3
 	POP		R2
 	POP		R1
 	POP		R0
