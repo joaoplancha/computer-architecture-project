@@ -30,10 +30,19 @@ fant_jogo		EQU		6H	; esta em jogo
 ; alternativamente substituimos R10 por uma posicao de memoria
 
 ciclo_fant:
-	PUSH.....
-	PUSH.....
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
 
-	MOV		R0,fant_stt
+	MOV		R0,fant_stt		; R0 = Apontador para estado do fantasma
 	MOV		R3,[R0]			; R3 = Estado do fantasma
 	MOV 	R4,fant_pos		; R4 = Apontador para posicao do fantasma
 
@@ -70,17 +79,25 @@ saicx_fant:
 	JGT		avisa			; se ja saiu da caixa
 	JMP		sai_fant 		;
 avisa:
-	MOV						; avisa que outro fantasma pode ser acordado
-	JMP
+;	MOV						; avisa que outro fantasma pode ser acordado
+;	JMP
 
 joga_fant:
 	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
 	MOVB	R6,[R4+1]		; R6 = coluna actual do fantasma
 	SUB 	R5,R1 			; diferenca entre linha do fantasma e do pacman
 	SUB 	R6,R2			; diferenca entre coluna do fantasma e do pacman
-
 	JMP		sai_fant 		;
 sai_fant:
-	POP.....
-	POP.....
-	RET
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	RET 
