@@ -144,7 +144,7 @@ tab:		WORD	sig0
 
 PLACE		0H	
 	MOV		SP,fim_pilha; incializa SP
-	MOV	BTE, tab		; incializa BTE
+	MOV		BTE, tab	; incializa BTE
 	MOV		R9,ES0_tec	; Coloca teclado no estado 0
 
 init:
