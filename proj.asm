@@ -23,16 +23,8 @@ POUT2	EQU	0C000H	; endereço do porto de E do teclado
 POUT3	EQU	06000H	; endereço do porto de E do display hexa extra
 MASK	EQU	10H		; mascara para ver se ja saimos do teclado
 ES0_tec EQU	0FFH	; estado zero do teclado. pode receber novo comando
-cima	EQU	1H		;
-baixo	EQU	9H
-esq		EQU	4H
-dir		EQU	6H
-ciesq	EQU	0H
-cidir	EQU	2H
-baesq	EQU	8H
-badir	EQU	0AH
-rstrt	EQU	0CH
-;
+
+
 ; **********************************************************************
 ; Desenhos
 base	 	EQU	8000H	; endereço do inicio do pixelScreen
@@ -60,16 +52,45 @@ mascaras:	STRING	80H,40H,20H,10H,08H,04H,02H,01H
 pac		:	STRING	7H,4H,7H	; desenho do pacman				
 fant	: 	STRING	5H,2H,5H	; desenho do fantasma
 obj		:	STRING 	2H,7H,2H	; desenho do objecto
-caixa	:	STRING	63H,41H,41H,41H,41H,41H,7FH
+caixa	:	STRING	63H,41H,41H,41H,41H,41H,7FH	; desenho da caixa
 nlin	:	WORD	3H
 ncol	:	WORD	3H
+
+; correspondencia de teclas com movimento do pacman
+tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
+			WORD	0FFFFH
+			WORD	0FFFFH		; 1 - cima				(-1, 0)
+			WORD	0000H
+			WORD	0FFFFH		; 2 - cima - direita	(-1, 1)
+			WORD	0001H
+			WORD	00FFH		; 3 - ND
+			WORD	00FFH
+			WORD	0000H		; 4 - esquerda			( 0,-1)
+			WORD	0FFFFH
+			WORD	00FFH		; 5 - ND
+			WORD	00FFH
+			WORD	0000H		; 6 - direita			( 0, 1)
+			WORD	0001H
+			WORD	00FFH		; 7 - ND
+			WORD	00FFH
+			WORD	0001H		; 8 - baixo - esquerda	( 1,-1)
+			WORD	0FFFFH
+			WORD	0001H		; 9 - baixo				( 1, 0)
+			WORD	0000H
+			WORD	0001H		; A - baixo - direita	( 1, 1)
+			WORD	0001H
+; teclas de controlo
+rstrt		EQU		0CH			; reiniciar jogo
+trmnt		EQU		0FH			; terminar jogo
+
 nlin_def	EQU	3H
 ncol_def	EQU	3H
-nlin_cx		EQU	7H
-ncol_cx		EQU	7H
+nlin_cx		EQU	7H				; numero de linhas da caixa
+ncol_cx		EQU	7H				; numero de colunas da caixa
 pac_ini_L	EQU 1AH				; linha inicial do pacman
 pac_ini_C	EQU 0DH				; coluna inicial do pacman
-obj_L1		EQU	1H
+; linhas e colunas dos objectos
+obj_L1		EQU	1H			
 obj_L2		EQU	1CH
 obj_C1		EQU	2H
 obj_C2		EQU	1BH
@@ -230,7 +251,23 @@ conv_key:				;
 	SUB		R9,1		; Subtrai uma unidade ao numero da coluna
 	MUL		R8,R4		; Multiplica o valor da coluna-1 por 4 
 	ADD		R9,R8		; Faz: (col-1) + (lin-1)*4 ... guarda em R9
+	;verifica se a tecla tem movimento atribuido
+	MOV		R8,R9		; Para nao estragar R9 que contem a tecla
+	MOV		R7,tec_def	; R7 = endereço da tabela de atribuicao de tecla
+	MOV		R3,4H		; cada tecla esta definida em 2 palavras
+	MUL		R8,R3		; para ir para a tecla respect. tenho que saltar
+						; 4 bytes * numero da tecla
+	ADD		R7,R8		; R7 fica a apontar para a posicao da tabela 
+						; correspondente ao movimento que queremos fazer
+	MOV		R3,[R7]		; R3 = valor da tecla na tabela
+	MOV		R7,ES0_tec
+	CMP		R3,R7		; se for igual ao estado zero do teclado, ou
+	JZ		rst_estd	; seja, se n estiver atribuida
 	JMP		sai_tec
+rst_estd:
+	MOV		R9,ES0_tec	; R9 = estado 0
+	JMP		sai_tec
+
 sai_tec:
 	POP		R10
 	POP		R8
@@ -246,11 +283,17 @@ sai_tec:
 
 ; **********************************************************************
 ; PACMAN
+; usa tecla recebida atraves do registo R9
+; usa a posicao actual do pacman recebida em R1 (linha) e R2 (coluna)
+; actualiza R1 e R2 com a nova posicao, move o pacman e faz o update
+; ao estado do teclado
 pacman:
 	PUSH	R0
 	PUSH	R3
+	PUSH 	R4
 	PUSH	R5
 	PUSH	R7
+	PUSH	R9
 	
 	; CONDICOES A VERIFICAR PARA MOVER PACMAN
 	; verificacao se o teclado esta ON ou OFF
@@ -271,117 +314,43 @@ pacman:
 	; por implementar
 	
 	; TODAS AS CONDICOES VERIFICADAS, PODEMOS MOVER O PACMAN
-	MOV		R7,0		; serve para controlar variavel de estado a limp
-	MOV		R8,pac
-
-						; movimento para cima
-	MOV		R0,cima
-	CMP		R9,R0
-	JZ		mov_cima
-						; movimento para baixo
-	MOV		R0,baixo
-	CMP		R9,R0
-	JZ		mov_baixo
-						; movimento para a esquerda
-	MOV		R0,dir
-	CMP		R9,R0
-	JZ		mov_dir
-						; movimento para a direita
-	MOV		R0,esq
-	CMP		R9,R0
-	JZ		mov_esq
-						; movimento para cima e esquerda
-	MOV		R0,ciesq
-	CMP		R9,R0
-	JZ		mov_ciesq
-						; movimento para cima e direita
-	MOV		R0,cidir
-	CMP		R9,R0
-	JZ		mov_cidir
-						; movimento para baixo e esquerda
-	MOV		R0,baesq
-	CMP		R9,R0
-	JZ		mov_baesq
-						; movimento para baixo e direita
-	MOV		R0,badir
-	CMP		R9,R0
-	JZ		mov_badir
+	MOV		R7,0		; serve para controlar variavel de estado 
+						; que controla o limpa ou o desenho
+	MOV		R8,pac		; coloca o desenho do pacman em R8
 	
-	JMP 	sai_pac
-
-mov_cima:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	SUB 	R1,1
-	CALL	go
-	JMP		sai_pac	
-mov_baixo:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	ADD 	R1,1
-	CALL	go
-	JMP		sai_pac	
-mov_dir:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	ADD 	R2,1
-	CALL	go
-	JMP		sai_pac	
-mov_esq:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	SUB 	R2,1
-	CALL	go
-	JMP		sai_pac
-mov_ciesq:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	SUB		R1,1
-	SUB 	R2,1
-	CALL	go
-	JMP		sai_pac
-mov_cidir:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	SUB 	R1,1
-	ADD		R2,1
-	CALL	go
-	JMP		sai_pac
-mov_baesq:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	ADD 	R1,1
-	SUB		R2,1
-	CALL	go
-	JMP		sai_pac
-mov_badir:
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a limpar
-	CALL	desenha		; limpa o desenho actual
-	ADD		R1,1
-	ADD 	R2,1
-	CALL	go
-	JMP		sai_pac
-go:	
-	MOV		R7,1		; server para por a variavel de estado a desenh
-	MOV		R0,des_limp
-	MOV		[R0],R7		; poe a variavel de controle do desenha a desenh
-	CALL 	desenha
-	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
-	MOV		R5,OFF		; Faz o update do estado do teclado para OFF
-	MOV		[R3],R5
-	RET
+	MOV		R0,tec_def	; R0 = apontador para tabela de movimentos
+	MOV		R3,4H		; cada tecla esta definida em 2 palavras
+	MUL		R9,R3		; para ir para a tecla respect. tenho que saltar
+						; 4 bytes * numero da tecla
+	ADD		R0,R9		; R0 fica a apontar para a posicao da tabela 
+						; correspondente ao movimento que queremos fazer
+	
+	MOV		R3,[R0]		; R3 = movimento em linha	
+	MOV 	R4,[R0+2]	; R4 = movimento em coluna (palavra seguinte)
+	
+	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
+						; rotina desenha (0 - limpa, 1 - desenha)
+	MOV		[R0],R7		; poe a variavel de estado de desenha a limpar
+	CALL	desenha		; limpa o desenho actual (apesar de a rotina se 
+						; chamar desenha, se a variavel de estado
+						; des_limp estiver a 0, a rotina apaga)
+	ADD		R1,R3		; movimento em linha: guarda nova posicao em R1
+	ADD		R2,R4		; movimento em coluna: guarda nova posicao em R2
+	
+	MOV		R7,1		;  
+	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
+	MOV		[R0],R7		; passar a desenhar
+	
+	CALL 	desenha		; Desenha o pacman na nova posicao
+	MOV		R3,keyb_stt	; Modifica a variavel de estado do teclado para
+	MOV		R5,OFF		; nao indicar que uma tecla premida foi aceite
+	MOV		[R3],R5		; colocando a veriavel a zero
 	
 sai_pac:
+	POP		R9
 	POP		R7
 	POP		R5
+	POP		R4
 	POP		R3
 	POP		R0
 	RET
@@ -435,15 +404,13 @@ limpa_c:
 ;
 ;
 ;
-;
-;tem que passar a receber em R tambem o n linhas e n colunas pq os 
-;desenhos podem ter isto diferente
 ; **********************************************************************
-; DESENHA
+; DESENHA (OU APAGA)
 ; Recebe a localizacao do desenho (canto superior esquerdo)
 ; em R1, R2 (linha, coluna)
 ; em R8 recebe o desenho
 ; nao retorna nada
+; desenha um objecto ou apaga-o, consoante a variável de estado indicar
 desenha:
 	PUSH	R0
 	PUSH	R1
