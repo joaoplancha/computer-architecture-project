@@ -231,6 +231,10 @@ update_keyb:
 	MOV		R5,[R3]		; Vai buscar a coluna de onde leu e guardou
 	MOVB 	R3,[R2]		; Ler do porto de entrada (saida do tecl.)
 						; regista se alguma tecla esta a ser premida
+	PUSH	R1
+	MOV		R1,000FH
+	AND		R3,R1
+	POP		R1
 	CMP 	R5,R3		; Compara o que leu com o que esta a ler agora
 	JZ 		sai_tec		; Tecla continua premida, sai sem fazer update 
 	MOV		R3,keyb_stt	; Quando a deixar de estar premida,
@@ -254,6 +258,10 @@ chk_pressed:			; Verifica se alguma tecla da linha foi premida
 						; indica ao teclado a linha a ver
 	MOVB 	R3,[R2]		; Ler do porto de entrada (saida do tecl.)
 						; regista se alguma tecla foi premida
+	PUSH	R1
+	MOV		R1,000FH
+	AND		R3,R1
+	POP		R1
 	AND 	R3,R3		; Afectar as flags (MOVs não afectam as flags)
 	JZ 		nxt_line	; Nenhuma tecla premida, passar a linha seguinte
 	
