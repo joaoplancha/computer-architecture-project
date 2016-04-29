@@ -41,13 +41,13 @@ caixa_col	EQU	0DH
 ; * Stack 
 ; **********************************************************************
 PLACE		2000H
-pilha:		TABLE 200H		; espaço reservado para a pilha 
+pilha:		TABLE 400H		; espaço reservado para a pilha 
 fim_pilha:				
 
 ; **********************************************************************
 ; * Dados
 ; **********************************************************************
-PLACE		2400H
+PLACE		2600H
 ; tabela de mascaras a usar pela rotina shape_draw:
 ; desenhos podem ser modificados
 ; tamanho maximo: 7x7
@@ -401,8 +401,8 @@ pacman:
 	ADD		R0,R9		; R0 fica a apontar para a posicao da tabela 
 						; correspondente ao movimento que queremos fazer
 	
-	MOV		R3,[R0]		; R3 = movimento em linha	
-	MOV 	R4,[R0+2]	; R4 = movimento em coluna (palavra seguinte)
+	MOV		R5,[R0]		; R3 = movimento em linha	
+	MOV 	R6,[R0+2]	; R4 = movimento em coluna (palavra seguinte)
 	
 	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
 						; rotina desenha (0 - limpa, 1 - desenha)
@@ -410,21 +410,11 @@ pacman:
 	CALL	desenha		; limpa o desenho actual (apesar de a rotina se 
 						; chamar desenha, se a variavel de estado
 						; des_limp estiver a 0, a rotina apaga)
-	ADD		R1,R3		; movimento em linha: guarda nova posicao em R1
-	ADD		R2,R4		; movimento em coluna: guarda nova posicao em R2
+	ADD		R1,R5		; movimento em linha: guarda nova posicao em R1
+	ADD		R2,R6		; movimento em coluna: guarda nova posicao em R2
 	
 	; verificacao de jogada	
 	CALL	check_move	; chama rotina de verificacao de jogada
-	MOV		R6,move_ok	;
-	MOV		R7,[R6]
-	AND		R7,R7
-	JNZ		pac_ok		; Pode mover
-	SUB		R1,R3 		; se nao pode mover
-	SUB		R2,R4		; se nao pode mover, desenha no mesmo sitio
-	
-pac_ok:
-	CALL	reset_check_move	; poe o check_ok a 1
-	
 	; fim de verificacao de jogada
 	MOV		R7,1		;  
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
@@ -608,6 +598,11 @@ out:
 
 	ADD		R1,R5		; move-se na direccao do pacman
 	ADD		R2,R6		; move-se na direccao do pacman
+	
+	; verificacao de jogada	
+	CALL	check_move	; chama rotina de verificacao de jogada
+	; fim de verificacao de jogada
+
 	MOV		R7,1		; 
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
 	MOV		[R0],R7		; passar a desenhar
@@ -624,14 +619,11 @@ out:
 	POP		R1
 	POP		R0
 	JMP		rst_fant 		;
-
-
 rst_fant:
 	MOV		R0,call_fant
 	MOV		R3,0
 	MOV		[R0],R3
 	JMP		sai_fant
-
 sai_fant:
 	POP		R10
 	POP		R9
@@ -969,52 +961,50 @@ sai_conta:
 ; movimento. Verifica se o movimento e valido ou nao.
 ; Recebe a posicao para onde o elemento se quer mover nos registos 
 ; R1 (linha) e R2 (coluna). 
-; O retorno e feito na variavel de estado move_ok, sendo 1=OK, 0=nOK
+; se nao puder mover os objectos, subtrai o deslocamento de R1 e R2
 check_move:
 	PUSH	R0
-	PUSH	R1
-	PUSH	R2
 	PUSH	R3
 	PUSH 	R4
-	PUSH	R5
-	PUSH	R6
 	PUSH	R7
 	PUSH	R8
 	PUSH	R9
 	PUSH	R10
+	
+	MOV		R7,R1
+	MOV		R8,R2
 	
 	; perimetro de jogo
 	MOV		R0,0H		; barreira superior/esquerda
 	MOV		R3,20H		; barreira inferior/direita
 	
 	; barreira superior
-	CMP		R1,R0
+	CMP		R7,R0
 	JZ		output_N
 	
 	; barreira inferior
-	MOV		R4,nlin		; apontador do numero de linhas do desenho
-	MOV		R5,[R4]		; numero de linhas do desenho
-	ADD		R1,R5		; soma o numero de linhas a 1a linha do desenho
-	CMP		R1,R3		
+	MOV		R9,nlin		; apontador do numero de linhas do desenho
+	MOV		R10,[R9]		; numero de linhas do desenho
+	ADD		R7,R10		; soma o numero de linhas a 1a linha do desenho
+	CMP		R7,R3		
 	JZ		output_N
 	
 	; barreira esquerda
-	CMP		R2,R0
+	CMP		R8,R0
 	JZ		output_N
 		
 	; barreira direita
-	MOV		R4,ncol		; apontador do numero de colunas do desenho
-	MOV		R5,[R4]		; numero de linhas do desenho
-	ADD		R2,R5		; soma o numero de colunas a 1a col. do desenho
-	CMP		R2,R3
+	MOV		R9,ncol		; apontador do numero de colunas do desenho
+	MOV		R10,[R9]		; numero de linhas do desenho
+	ADD		R8,R10		; soma o numero de colunas a 1a col. do desenho
+	CMP		R8,R3
 	JZ		output_N
 	
 	JMP		sai_check_move	; pode mover-se
 	
 output_N:
-	MOV		R4,move_ok
-	MOV		R5,0H
-	MOV		[R4],R5		; indica que o movimento nao e ok
+	SUB		R1,R5
+	SUB		R2,R6
 	JMP		sai_check_move
 
 sai_check_move:	
@@ -1022,25 +1012,8 @@ sai_check_move:
 	POP		R9
 	POP		R8
 	POP		R7
-	POP		R6
-	POP		R5
 	POP		R4
 	POP		R3
-	POP		R2
-	POP		R1
-	POP		R0
-	RET
-
-; **********************************************************************
-; Reset do Check MOVE
-; tem que ser invocada após cada invocação de check_move
-reset_check_move:
-	PUSH	R0
-	PUSH	R1
-	MOV		R0,move_ok
-	MOV		R1,1H
-	MOV		[R0],R1
-	POP		R1
 	POP		R0
 	RET
 
