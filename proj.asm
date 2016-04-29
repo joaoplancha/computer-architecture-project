@@ -82,9 +82,18 @@ tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
 			WORD	0000H
 			WORD	0001H		; A - baixo - direita	( 1, 1)
 			WORD	0001H
+			WORD	00FFH		; B - ND
+			WORD	00FFH
+			WORD	00FFH		; C - ND
+			WORD	00FFH
+			WORD	00FFH		; D - ND
+			WORD	00FFH
+			WORD	00FFH		; E - ND
+			WORD	00FFH
+
 ; teclas de controlo
-rstrt		EQU		0CH			; reiniciar jogo
-trmnt		EQU		0FH			; terminar jogo
+rstrt		EQU		0FH			; reiniciar jogo
+trmnt		EQU		0EH			; terminar jogo
 
 nlin_def	EQU	3H
 ncol_def	EQU	3H
@@ -139,7 +148,7 @@ keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
 keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
 des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
-move_ok:		WORD	1H ;OK para o elemento se mover (0 = nOK)
+move_ok:	WORD	1H ;OK para o elemento se mover (0 = nOK)
 
 ; **********************************************************************
 ; Tabela de vectores de interrupção
