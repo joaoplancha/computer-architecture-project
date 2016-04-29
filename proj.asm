@@ -19,8 +19,9 @@
 BUFFER	EQU	100H	; endereço de memória onde se guarda a tecla		
 LINHA	EQU	1		; posição do bit correspondente à linha (1) a testar
 PIN		EQU	0E000H	; endereço do porto de S do teclado
+POUT1	EQU	0A000H	; endereço do porto de E do display 
 POUT2	EQU	0C000H	; endereço do porto de E do teclado
-POUT3	EQU	06000H	; endereço do porto de E do display hexa extra
+POUT3	EQU	06000H	; endereço do porto de E do display extra
 MASK	EQU	10H		; mascara para ver se ja saimos do teclado
 ES0_tec EQU	0FFH	; estado zero do teclado. pode receber novo comando
 
@@ -100,6 +101,7 @@ obj_C2		EQU	1BH
 
 ; **********************************************************************
 ; Fantasmas
+PLACE 	24C0H
 fant_lin		EQU		0DH
 fant_col		EQU		0FH
 
@@ -122,6 +124,9 @@ fant_pos	:	WORD 	0D0FH
 
 call_fant	:	WORD	0H	; variavel de chamada da interrupcao
 							; 1 executa, 0 nao executa
+conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao
+							; 1 conta tempo, 0 nao conta
+contador	:	STRING	0H	; guarda a contagem de tempo
 
 fant_dorme		EQU		0H
 fant_acorda		EQU		1H
@@ -139,7 +144,7 @@ des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
 ; **********************************************************************
 ; Tabela de vectores de interrupção
 tab:		WORD	sig0
-			;WORD	sig1
+			WORD	sig1
 
 
 PLACE		0H	
@@ -162,6 +167,9 @@ init:
 	; desenha os objectos na posicao inicial:
 	PUSH	R1
 	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	
 	MOV		R1,obj_L1	;
 	MOV		R2,obj_C1	;
 	MOV		R8,obj		;
@@ -178,12 +186,33 @@ init:
 	MOV		R2,obj_C2	;
 	MOV		R8,obj		;
 	CALL	desenha		;
+	
+	; coloca os fantasmas todos no estado inicial e posicao inicial:
+	MOV		R1,fant_stt
+	MOV		R2,0100H		; estado inicial dos fantasmas
+	MOV		[R1],R2		; guarda estado inicial dos fantasmas em memoria
+	MOV		R1,fant_pos	;
+	MOV		R2,0D0FH	; posicao inicial do fantasma 1
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 1 em mem
+	
+	; contador a zero
+	MOV		R3,POUT1	; endereco do Periferico de saida 1
+	MOV		R4,0		; comeca a contagem de segundos a zero
+	MOV		[R3],R4		; coloca o valor no display
+	MOV		R3,contador	; R3 = apontador para contador
+	MOV		[R3],R4		; guarda o valor actual de contagem em memoria
+	
+	POP	R4
+	POP	R3
 	POP	R2
 	POP R1
 	EI0
+	EI1
 	EI
 	
+	
 ciclo:
+	CALL	conta		; contagem de tempo
 	CALL	teclado		; Varrimento e leitura das teclas
 	CALL	pacman		; Controlar movimentos do pacman
 	CALL	fantasmas	; Controlar accoes dos fantasmas
@@ -863,13 +892,54 @@ b_d:
 	RET
 
 ; **********************************************************************
+; INCREMENTA CONTADOR DE TEMPO
+; Nao recebe nem retorna argumentos
+; Incrementa o contador de tempo uma unidade
+; accionado por rotina de interrupcao sig0
+conta:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	
+	MOV		R0,conta_tempo	;vai buscar a variavel de contagem
+	MOV		R1,[R0]			; ve o seu valor
+	AND		R1,R1
+	JZ		sai_conta	; se for zero, sai, se for 1 conta!
+	MOV		R0,POUT1	; R0 = endereco do Periferico de saida 1
+	MOV		R1,contador ; R1 = apontador para contador
+	MOVB	R2,[R1]		; R2 =  o valor actual de contagem em memoria
+	ADD		R2,1		; soma uma unidade ao valor de contagem
+	MOVB	[R0],R2		; coloca no display a contagem actual
+	MOVB	[R1],R2		; coloca na memoria a contagem actual
+
+sai_conta:
+	MOV		R0,conta_tempo
+	MOV		R1,0H
+	MOV		[R0],R1			; poe a variavel de contagem a zero outra x
+	POP		R2
+	POP		R1
+	POP		R0
+	RET
+
+; **********************************************************************
 ; **********************************************************************
 ; ROTINAS DE INTERRUPCAO
 ; **********************************************************************
 ; **********************************************************************
-; sig0: move fantasma
-
+; sig0: conta tempo
 sig0:
+	PUSH	R0
+	PUSH	R3
+	MOV		R0,conta_tempo
+	MOV		R3,1
+	MOV		[R0],R3
+	POP		R3
+	POP		R0
+	RFE
+	
+; **********************************************************************
+; sig1: move fantasma
+sig1:
 	PUSH	R0
 	PUSH	R3
 	MOV		R0,call_fant
@@ -878,3 +948,5 @@ sig0:
 	POP		R3
 	POP		R0
 	RFE
+
+
