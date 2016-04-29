@@ -900,15 +900,27 @@ conta:
 	PUSH	R0
 	PUSH	R1
 	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
 	
 	MOV		R0,conta_tempo	;vai buscar a variavel de contagem
 	MOV		R1,[R0]			; ve o seu valor
 	AND		R1,R1
 	JZ		sai_conta	; se for zero, sai, se for 1 conta!
+	
+	MOV		R3,0AH		; ver se chegou a XA -> para contagem decimal
+	MOV		R5,000FH	; mascara para isolar o XXXAH
 	MOV		R0,POUT1	; R0 = endereco do Periferico de saida 1
 	MOV		R1,contador ; R1 = apontador para contador
 	MOVB	R2,[R1]		; R2 =  o valor actual de contagem em memoria
 	ADD		R2,1		; soma uma unidade ao valor de contagem
+	MOV		R4,R2		;
+	AND		R4,R5		; isola o ultimo nibble
+	CMP		R4,R3		; chegou a A no ultimo nibble?
+	JNZ		incr_cont	; se nao chegou, incrementa normalmente
+	ADD		R2,6		; se ja chegou a 10, conta em modo decimal 
+incr_cont:	
 	MOVB	[R0],R2		; coloca no display a contagem actual
 	MOVB	[R1],R2		; coloca na memoria a contagem actual
 
@@ -916,6 +928,9 @@ sai_conta:
 	MOV		R0,conta_tempo
 	MOV		R1,0H
 	MOV		[R0],R1			; poe a variavel de contagem a zero outra x
+	POP		R5
+	POP		R4
+	POP		R3
 	POP		R2
 	POP		R1
 	POP		R0
