@@ -379,13 +379,6 @@ pacman:
 	CMP		R9,R3		
 	JZ		sai_pac		; sai da rotina sem fazer nada
 	
-	; verificacao do estado do pacman
-	; encostado à esquerda = 1000 0000
-	; encostado à direita = 0001 0000
-	; encostado acima = 0000 1000
-	; encostado abaixo = 0000 0001
-	; por implementar
-	
 	; TODAS AS CONDICOES VERIFICADAS, PODEMOS MOVER O PACMAN
 	MOV		R7,0		; serve para controlar variavel de estado 
 						; que controla o limpa ou o desenho
@@ -918,11 +911,20 @@ conta:
 	MOV		R4,R2		;
 	AND		R4,R5		; isola o ultimo nibble
 	CMP		R4,R3		; chegou a A no ultimo nibble?
-	JNZ		incr_cont	; se nao chegou, incrementa normalmente
+	JNZ		check_A0	; se nao chegou, vai ver se chegou a A0
 	ADD		R2,6		; se ja chegou a 10, conta em modo decimal 
-incr_cont:	
+check_A0:	
+	;se chegou ao A0, recomeça do 00
+	MOV		R4,0A0H
+	CMP		R2,R4
+	JNZ		incr_cont	; se ainda nao chegou ao A0, conta normalmente
+	MOV		R2,00H		; se ja chegou ao A0, recomeca do 00
+incr_cont:
 	MOVB	[R0],R2		; coloca no display a contagem actual
 	MOVB	[R1],R2		; coloca na memoria a contagem actual
+	
+	;se chegou ao 99, recomeça
+	
 
 sai_conta:
 	MOV		R0,conta_tempo
