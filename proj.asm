@@ -101,7 +101,6 @@ obj_C2		EQU	1BH
 
 ; **********************************************************************
 ; Fantasmas
-PLACE 	24C0H
 fant_lin		EQU		0DH
 fant_col		EQU		0FH
 
@@ -140,6 +139,7 @@ keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
 keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
 des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
+move_ok:		WORD	1H ;OK para o elemento se mover (0 = nOK)
 
 ; **********************************************************************
 ; Tabela de vectores de interrupção
@@ -365,6 +365,7 @@ pacman:
 	PUSH	R3
 	PUSH 	R4
 	PUSH	R5
+	PUSH	R6
 	PUSH	R7
 	PUSH	R9
 	
@@ -403,6 +404,19 @@ pacman:
 	ADD		R1,R3		; movimento em linha: guarda nova posicao em R1
 	ADD		R2,R4		; movimento em coluna: guarda nova posicao em R2
 	
+	; verificacao de jogada	
+	CALL	check_move	; chama rotina de verificacao de jogada
+	MOV		R6,move_ok	;
+	MOV		R7,[R6]
+	AND		R7,R7
+	JNZ		pac_ok		; Pode mover
+	SUB		R1,R3 		; se nao pode mover
+	SUB		R2,R4		; se nao pode mover, desenha no mesmo sitio
+	
+pac_ok:
+	CALL	reset_check_move	; poe o check_ok a 1
+	
+	; fim de verificacao de jogada
 	MOV		R7,1		;  
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
 	MOV		[R0],R7		; passar a desenhar
@@ -415,6 +429,7 @@ pacman:
 sai_pac:
 	POP		R9
 	POP		R7
+	POP		R6
 	POP		R5
 	POP		R4
 	POP		R3
@@ -934,6 +949,88 @@ sai_conta:
 	POP		R4
 	POP		R3
 	POP		R2
+	POP		R1
+	POP		R0
+	RET
+
+; **********************************************************************
+; CHECK MOVE
+; Rotina de verificacao de movimento do pacman/fantasma.
+; Deve ser chamada de cada vez que um destes elementos quer fazer um
+; movimento. Verifica se o movimento e valido ou nao.
+; Recebe a posicao para onde o elemento se quer mover nos registos 
+; R1 (linha) e R2 (coluna). 
+; O retorno e feito na variavel de estado move_ok, sendo 1=OK, 0=nOK
+check_move:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH 	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+	; perimetro de jogo
+	MOV		R0,0H		; barreira superior/esquerda
+	MOV		R3,20H		; barreira inferior/direita
+	
+	; barreira superior
+	CMP		R1,R0
+	JZ		output_N
+	
+	; barreira inferior
+	MOV		R4,nlin		; apontador do numero de linhas do desenho
+	MOV		R5,[R4]		; numero de linhas do desenho
+	ADD		R1,R5		; soma o numero de linhas a 1a linha do desenho
+	CMP		R1,R3		
+	JZ		output_N
+	
+	; barreira esquerda
+	CMP		R2,R0
+	JZ		output_N
+		
+	; barreira direita
+	MOV		R4,ncol		; apontador do numero de colunas do desenho
+	MOV		R5,[R4]		; numero de linhas do desenho
+	ADD		R2,R5		; soma o numero de colunas a 1a col. do desenho
+	CMP		R2,R3
+	JZ		output_N
+	
+	JMP		sai_check_move	; pode mover-se
+	
+output_N:
+	MOV		R4,move_ok
+	MOV		R5,0H
+	MOV		[R4],R5		; indica que o movimento nao e ok
+	JMP		sai_check_move
+
+sai_check_move:	
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	RET
+
+; **********************************************************************
+; Reset do Check MOVE
+; tem que ser invocada após cada invocação de check_move
+reset_check_move:
+	PUSH	R0
+	PUSH	R1
+	MOV		R0,move_ok
+	MOV		R1,1H
+	MOV		[R0],R1
 	POP		R1
 	POP		R0
 	RET
