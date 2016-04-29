@@ -871,25 +871,29 @@ b_d:
 	
 	; desenha caixa central de onde saem os fantasmas
 	; coloca as dimensoes linha e coluna da caixa
-	MOV		R5,nlin
-	MOV		R6,nlin_cx
-	MOV		[R5],R6
+	MOV		R5,nlin		; R5 = endereco de numero de linhas a usar pela
+						; rotina de desenho
+	MOV		R6,nlin_cx	; R6 = numero de linhas que a caixa vai ter
+	MOV		[R5],R6		; coloca o numero de linhas da caixa no endereco
+						; apontado por R5, que corresponde a nlin
+	MOV		R5,ncol		; R5 = endereco de numero de colunas a usar pela
+						; rotina de desenho
+	MOV		R6,ncol_cx	; R6 = numero de colunas que a caixa vai ter
+	MOV		[R5],R6		; coloca o num. de colunas da caixa no endereco
+						; apontado por R5, que corresponde a ncol
+		
+	MOV		R1,caixa_lin ; R1 = canto da caixa para usar "desenho"
+	MOV		R2,caixa_col ; R2 = canto da caixa para usar "desenho"
+	MOV		R8,caixa	 ; R8 =  desenho da caixa
+	CALL 	desenha		 ; desenha a caixa
+	
+	MOV		R5,nlin		
+	MOV		R6,nlin_def  ; numero de linhas originalmente em nlin
+	MOV		[R5],R6		
 	MOV		R5,ncol
-	MOV		R6,ncol_cx
+	MOV		R6,ncol_def	 ; numero de colunas originalmente em ncol
 	MOV		[R5],R6
 		
-	MOV		R1,caixa_lin
-	MOV		R2,caixa_col
-	MOV		R8,caixa
-	CALL 	desenha
-	
-	MOV		R5,nlin
-	MOV		R6,nlin_def
-	MOV		[R5],R6
-	MOV		R5,ncol
-	MOV		R6,ncol_def
-	MOV		[R5],R6
-	
 	POP		R8
 	POP		R6
 	POP		R5
@@ -999,6 +1003,48 @@ check_move:
 	ADD		R8,R10		; soma o numero de colunas a 1a col. do desenho
 	CMP		R8,R3
 	JZ		output_N
+
+chk_ver:	
+	; caixa vertical
+	MOV		R4,caixa_col
+	MOV		R7,ncol_def
+	SUB		R4,R7			
+	ADD		R4,1			; pq o pacman/fant tem n colunas de largura
+							; e a referencia e o canto superior esquerdo
+							; e cm se estivessemos a expandir a caixa
+							; para a esquerda
+	CMP		R4,R2			
+	JGT		chk_hor			; se o elemento esta ao lado esquerdo da cx
+	ADD		R4,R7
+	MOV		R7,ncol_cx	
+	ADD		R4,R7			
+	SUB		R4,2			; vai ao extremo direito verificar
+	CMP		R2,R4			
+	JGT		chk_hor			; se o elemento estiver a direita da caixa
+	; ver se esta a tocar no extremo superior  ou inferior da caixa:
+	MOV		R3,caixa_lin
+	MOV		R7,nlin_def
+	SUB		R3,R7			
+	ADD		R3,1			; pq o pacman/fant tem n linhas de altura
+							; e a referencia e o canto superior esquerdo
+							; e cm se estivessemos a expandir a caixa
+							; para cima
+	CMP		R3,R1
+	JZ		output_N		; esta em cima da barreira superior 
+	ADD		R3,R7
+	MOV		R7,nlin_cx
+	ADD		R3,R7			
+	SUB		R3,2			; senao vamos ver a barreira inferior
+	CMP		R3,R1			
+	JZ		output_N		; esta em cima da barreira inferior
+	JMP		chk_hor			; caso contrario, vamos verificar na horiz.
+
+chk_hor:
+	; caixa horizontal
+
+
+
+
 	
 	JMP		sai_check_move	; pode mover-se
 	
