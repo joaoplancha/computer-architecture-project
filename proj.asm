@@ -964,7 +964,7 @@ sai_conta:
 ; Deve ser chamada de cada vez que um destes elementos quer fazer um
 ; movimento. Verifica se o movimento e valido ou nao.
 ; Recebe a posicao para onde o elemento se quer mover nos registos 
-; R1 (linha) e R2 (coluna). 
+; R1 (linha) e R2 (coluna).  Usa tb R5 e R6
 ; se nao puder mover os objectos, subtrai o deslocamento de R1 e R2
 check_move:
 	PUSH	R0
@@ -1004,48 +1004,36 @@ check_move:
 	CMP		R8,R3
 	JZ		output_N
 
-chk_ver:	
-	; caixa vertical
-	MOV		R4,caixa_col
-	MOV		R7,ncol_def
-	SUB		R4,R7			
-	ADD		R4,1			; pq o pacman/fant tem n colunas de largura
-							; e a referencia e o canto superior esquerdo
-							; e cm se estivessemos a expandir a caixa
-							; para a esquerda
-	CMP		R4,R2			
-	JGT		chk_hor			; se o elemento esta ao lado esquerdo da cx
-	ADD		R4,R7
-	MOV		R7,ncol_cx	
-	ADD		R4,R7			
-	SUB		R4,2			; vai ao extremo direito verificar
-	CMP		R2,R4			
-	JGT		chk_hor			; se o elemento estiver a direita da caixa
-	; ver se esta a tocar no extremo superior  ou inferior da caixa:
-	MOV		R3,caixa_lin
-	MOV		R7,nlin_def
-	SUB		R3,R7			
-	ADD		R3,1			; pq o pacman/fant tem n linhas de altura
-							; e a referencia e o canto superior esquerdo
-							; e cm se estivessemos a expandir a caixa
-							; para cima
-	CMP		R3,R1
-	JZ		output_N		; esta em cima da barreira superior 
-	ADD		R3,R7
-	MOV		R7,nlin_cx
-	ADD		R3,R7			
-	SUB		R3,2			; senao vamos ver a barreira inferior
-	CMP		R3,R1			
-	JZ		output_N		; esta em cima da barreira inferior
-	JMP		chk_hor			; caso contrario, vamos verificar na horiz.
-
-chk_hor:
-	; caixa horizontal
-
-
-
-
+chk_cx:
+	MOV		R7,caixa_lin	; R7 = limite superior da caixa
+	MOV		R0,nlin_cx		; numero de linhas da caixa
+	SUB		R0,1			; -1 
+	MOV		R8,caixa_lin
+	ADD		R8,R0			; R8 = limite inferior da caixa
 	
+	MOV 	R9,caixa_col	; R9 = limite esquerdo da caixa
+	MOV		R0,ncol_cx		; numero de linhas da caixa
+	SUB		R0,1			; -1
+	MOV		R10,caixa_col
+	ADD		R10,R0			; R10 = limite direito da caixa
+chk_hor:	
+	MOV		R0,nlin_def		; para criar um buffer em cima
+	SUB		R7,R0			; buffer criado
+	CMP		R1,R7
+	JLE		sai_check_move	; se estiver acima do limite sup c/ buffer
+	CMP		R1,R8			; se estiver abaixo, vai ver se esta acima
+							; do limite inferior sem buffer
+	JGT		sai_check_move	; Se estiver abaixo do limite inferior
+chk_ver:
+	MOV		R3,ncol_def		; para criar um buffer a esquerda
+	SUB		R9,R3			; buffer criado
+	CMP		R2,R9
+	JLE		sai_check_move	; se esta a esquerda do limite esq. c/buffer		
+	CMP		R2,R10
+	JGT		sai_check_move	; se esta a direita do limite dir. s/buffer
+	JMP		output_N		; esta a querer ir para cima da caixa.
+							; nao autorizado.
+
 	JMP		sai_check_move	; pode mover-se
 	
 output_N:
