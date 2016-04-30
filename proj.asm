@@ -458,7 +458,7 @@ fantasmas:
 	MOV		R10,[R0]
 	MOV		R3,0
 	CMP		R10,R3
-	JZ		sai_fant
+	JZ		rst_fant
 	
 	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
 	MOVB 	R3,[R0]			; R3 = Estado do fantasma
@@ -598,11 +598,24 @@ out:
 
 	ADD		R1,R5		; move-se na direccao do pacman
 	ADD		R2,R6		; move-se na direccao do pacman
-	
-	; verificacao de jogada	
+	;para verificar se houver mesmo movimento mais a frente
+	MOV 	R0,R1		; guarda valor de R1 em R0 para usar a frente
+	MOV		R7,R2		; guarda valor de R2 em R7 para usar a frente
+chk_mv_fant:	
 	CALL	check_move	; chama rotina de verificacao de jogada
-	; fim de verificacao de jogada
+	CMP		R0,R1		; O R1 pode ter sido modificado
+	JZ		fant_cont
+						;se forem diferentes, significa que o check_move
+						; fez o reset ao R1 E ao R2 e que o fantasma
+						; ficou bloqueado
+	MOV		R1,R0		; experimentar a mover so na linha		
+	CALL	check_move	; tenta outra vez
+	CMP		R0,R1		; 
+	JZ		fant_cont
+	MOV		R2,R7		; repoe valor de coluna
+	CALL	check_move	; tenta outra vez
 
+fant_cont:
 	MOV		R7,1		; 
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
 	MOV		[R0],R7		; passar a desenhar
