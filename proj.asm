@@ -123,6 +123,8 @@ fant_stt	:	STRING	1H,0H,0H,0H
 ; estado 1 fantasma em cada posicao da string
 ; fantasma0, fantasma1, fantasma2, fantasma3
 
+fant_act	: 	STRING	0H; fantasma actual
+
 fant_pos	:	WORD 	0D0FH
 				WORD 	0D0FH
 				WORD 	0D0FH
@@ -140,6 +142,7 @@ fant_dorme		EQU		0H
 fant_acorda		EQU		1H
 fant_caixa		EQU		5H 	; 2, 3, 4, 5, esta na caixa
 fant_jogo		EQU		6H	; esta em jogo
+fant_bloq		EQU		7H	; esta bloqueado
 
 ; variaveis de estado
 ON			EQU	1H
@@ -148,7 +151,7 @@ keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
 keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
 des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
-move_ok:	WORD	1H ;OK para o elemento se mover (0 = nOK)
+move_ok:	WORD	0H ;(0 - ok, 1 - nOK, retry, 2 - bloqueado)
 
 ; **********************************************************************
 ; Tabela de vectores de interrupção
@@ -481,6 +484,13 @@ fantasmas:
 
 	CMP		R3,fant_jogo	; Se estiver fora da caixa, esta em jogo
 	JZ		move_fant		; vai mover-se na direccao do pacman
+	
+	CMP		R3,fant_bloq
+	JZ		desbloq_fant
+	
+desbloq_fant:
+	CALL desbloqueia
+	JMP		rst_fant
 
 acorda_fant:
 	PUSH	R1				; preservar linha e coluna do pacman nos
@@ -541,7 +551,28 @@ avisa:
 
 
 move_fant:
-	
+	CALL	GO
+
+rst_fant:
+	MOV		R0,call_fant
+	MOV		R3,0
+	MOV		[R0],R3
+	JMP		sai_fant
+sai_fant:
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	RET 
+;	*******************************************************************
+GO:
 	PUSH	R0
 	PUSH	R1				; preservar linha e coluna do pacman nos
 	PUSH	R2				; registos R1 e R2
@@ -603,18 +634,49 @@ out:
 	MOV		R7,R2		; guarda valor de R2 em R7 para usar a frente
 chk_mv_fant:	
 	CALL	check_move	; chama rotina de verificacao de jogada
-	CMP		R0,R1		; O R1 pode ter sido modificado
-	JZ		fant_cont
-						;se forem diferentes, significa que o check_move
+	PUSH	R0
+	MOV		R0,move_ok
+	MOV		R3,[R0]
+	CMP		R3,0
+	POP		R0
+	JZ		fant_cont	; se tudo correu bem
+	
+	;CMP		R0,R1		;
+	;JZ		fant_cont
+	;CMP		R7,R2		; 
+	;JZ		fant_cont
+						; se forem diferentes, significa que o check_move
 						; fez o reset ao R1 E ao R2 e que o fantasma
 						; ficou bloqueado
 	MOV		R1,R0		; experimentar a mover so na linha		
 	CALL	check_move	; tenta outra vez
-	CMP		R0,R1		; 
+	PUSH	R0
+	MOV		R0,move_ok
+	MOV		R3,[R0]
+	CMP		R3,0
+	POP		R0
+	;CMP		R0,R1		; se fez reset a linha, e porque nao funcionou
 	JZ		fant_cont
+	
 	MOV		R2,R7		; repoe valor de coluna
 	CALL	check_move	; tenta outra vez
+	PUSH	R0
+	MOV		R0,move_ok
+	MOV		R3,[R0]
+	CMP		R3,0
+	POP		R0
+	JZ		fant_cont	
 
+	; esta bloqueado!
+
+	MOV 	R0,fant_stt
+	MOV		R3,fant_act
+	ADD		R0,R3			; R0 aponta para o estado do fantasma actual
+	MOV		R3,fant_bloq
+	MOVB	[R0],R3			; coloca estado a 7 - bloqueado
+							; na proxima iteracao vai para a rotina de
+							; desbloqueio
+	
 fant_cont:
 	MOV		R7,1		; 
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
@@ -631,25 +693,7 @@ fant_cont:
 	POP		R2
 	POP		R1
 	POP		R0
-	JMP		rst_fant 		;
-rst_fant:
-	MOV		R0,call_fant
-	MOV		R3,0
-	MOV		[R0],R3
-	JMP		sai_fant
-sai_fant:
-	POP		R10
-	POP		R9
-	POP		R8
-	POP		R7
-	POP		R6
-	POP		R5
-	POP		R4
-	POP		R3
-	POP		R2
-	POP		R1
-	POP		R0
-	RET 
+	RET
 
 ; **********************************************************************
 ; CONTROLO	
@@ -1033,25 +1077,34 @@ chk_hor:
 	MOV		R0,nlin_def		; para criar um buffer em cima
 	SUB		R7,R0			; buffer criado
 	CMP		R1,R7
-	JLE		sai_check_move	; se estiver acima do limite sup c/ buffer
+	JLE		output_Y	; se estiver acima do limite sup c/ buffer
 	CMP		R1,R8			; se estiver abaixo, vai ver se esta acima
 							; do limite inferior sem buffer
-	JGT		sai_check_move	; Se estiver abaixo do limite inferior
+	JGT		output_Y	; Se estiver abaixo do limite inferior
 chk_ver:
 	MOV		R3,ncol_def		; para criar um buffer a esquerda
 	SUB		R9,R3			; buffer criado
 	CMP		R2,R9
-	JLE		sai_check_move	; se esta a esquerda do limite esq. c/buffer		
+	JLE		output_Y	; se esta a esquerda do limite esq. c/buffer		
 	CMP		R2,R10
-	JGT		sai_check_move	; se esta a direita do limite dir. s/buffer
+	JGT		output_Y	; se esta a direita do limite dir. s/buffer
 	JMP		output_N		; esta a querer ir para cima da caixa.
 							; nao autorizado.
 
-	JMP		sai_check_move	; pode mover-se
+	JMP		output_Y	; pode mover-se
 	
 output_N:
+	MOV		R3,move_ok
+	MOV		R4,1			; nao pode mover. tentar linha e coluna.
+	MOV		[R3],R4
 	SUB		R1,R5
 	SUB		R2,R6
+	JMP		sai_check_move
+
+output_Y:
+	MOV		R3,move_ok
+	MOV		R4,0			; nao pode mover. tentar linha e coluna.
+	MOV		[R3],R4
 	JMP		sai_check_move
 
 sai_check_move:	
@@ -1061,6 +1114,118 @@ sai_check_move:
 	POP		R7
 	POP		R4
 	POP		R3
+	POP		R0
+	RET
+	
+; *********************************************************************	
+; DESBLOQUEIA FANTASMA
+; R5 (linha) e R6 (coluna).  
+desbloqueia:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH 	R4
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+	MOV		R7,caixa_lin	; R7 = limite superior da caixa
+	MOV		R0,nlin_cx		; numero de linhas da caixa
+	MOV		R8,caixa_lin
+	ADD		R8,R0			; R8 = limite inferior da caixa
+	
+	MOV 	R9,caixa_col	; R9 = limite esquerdo da caixa
+	MOV		R0,ncol_cx		; numero de linhas da caixa
+	SUB		R0,1			; -1
+	MOV		R10,caixa_col
+	ADD		R10,R0			; R10 = limite direito da caixa
+;chk_hor:	
+	MOV		R0,nlin_def		; para criar um buffer em cima
+	SUB		R7,R0			; buffer criado
+	CMP		R5,R7
+	JZ		lim_sup		; se estiver acima do limite sup c/ buffer
+	CMP		R5,R8			; se estiver abaixo, vai ver se esta acima
+							; do limite inferior sem buffer
+	JZ		lim_inf		; Se estiver abaixo do limite inferior
+;chk_ver:
+	MOV		R3,ncol_def		; para criar um buffer a esquerda
+	SUB		R9,R3			; buffer criado
+	CMP		R6,R9
+	JLE		lim_esq	; se esta a esquerda do limite esq. c/buffer		
+	CMP		R6,R10
+	JGT		lim_inf	; se esta a direita do limite dir. s/buffer
+	JMP		output_N		; esta a querer ir para cima da caixa.
+							; nao autorizado.
+							
+lim_sup:
+lim_inf:
+lim_esq:
+lim_dir:
+	CMP		R6,R9
+	JLE		rst_desbloqueia
+	CMP		R6,R10
+	JGT		rst_desbloqueia
+	
+	MOV		R1,R6
+	SUB		R1,R9		; distancia a esquerda
+	MOV		R2,R6
+	SUB		R2,R10		; distancia a direita
+	NEG		R2			; distancia tem que ser positiva
+	CMP		R1,R2		; qual a distancia mais curta?
+	JLE		desloca_esq;
+	JGT		desloca_dir;
+desloca_esq:
+	MOV		R1,-1
+desloca_dir:
+	MOV		R2,1
+
+desloca_hor:
+	MOV		R2,0
+	SWAP	R1,R5
+	SWAP	R2,R6
+	MOV		R7,0			; serve para controlar variavel de estado 
+							; que controla o limpa ou o desenho
+	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
+	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
+						; rotina desenha (0 - limpa, 1 - desenha)
+	MOV		[R0],R7		; poe a variavel de estado de desenha a limpar
+	CALL	desenha		; limpa o desenho actual (apesar de a rotina se 
+						; chamar desenha, se a variavel de estado
+						; des_limp estiver a 0, a rotina apaga)
+
+	ADD		R1,R5		; move-se na direccao do pacman
+	ADD		R2,R6		; move-se na direccao do pacman
+
+	MOV		R7,1		; 
+	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
+	MOV		[R0],R7		; passar a desenhar
+	
+	CALL 	desenha		; Desenha o fantasma na nova posicao
+	
+	SHL		R1,8
+	ADD		R1,R2
+	MOV		[R4],R1		; coloca a nova pos. do fantasma em memoria
+	JMP		rst_desbloqueia
+
+							
+rst_desbloqueia:
+	MOV 	R0,fant_stt
+	MOV		R3,fant_act
+	ADD		R0,R3			; R0 aponta para o estado do fantasma actual
+	MOV		R3,fant_jogo
+	MOVB	[R0],R3	; coloca estado a 6 - em jogo
+
+sai_desbloqueia:	
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
 	POP		R0
 	RET
 
