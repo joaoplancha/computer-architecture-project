@@ -1166,39 +1166,46 @@ check_move:
 	CMP		R8,R3
 	JZ		output_N
 
+
+; verificacao do bloqueio contra a caixa central
 chk_cx:
 	MOV		R7,caixa_lin	; R7 = limite superior da caixa
 	MOV		R0,nlin_cx		; numero de linhas da caixa
-	SUB		R0,1			; -1 
 	MOV		R8,caixa_lin
 	ADD		R8,R0			; R8 = limite inferior da caixa
 	
 	MOV 	R9,caixa_col	; R9 = limite esquerdo da caixa
 	MOV		R0,ncol_cx		; numero de linhas da caixa
-	SUB		R0,1			; -1
 	MOV		R10,caixa_col
 	ADD		R10,R0			; R10 = limite direito da caixa
-chk_hor:	
+; verificar posicionamento vertical
+chk_vertical:	
 	MOV		R0,nlin_def		; para criar um buffer em cima
 	SUB		R7,R0			; buffer criado
-	CMP		R1,R7
-	JLE		output_Y	; se estiver acima do limite sup c/ buffer
-	CMP		R1,R8			; se estiver abaixo, vai ver se esta acima
-							; do limite inferior sem buffer
-	JGT		output_Y	; Se estiver abaixo do limite inferior
-chk_ver:
+	CMP		R1,R7			; compara posicao com barreira superior
+	JLE		output_Y		; se estiver acima do limite sup c/ buffer
+	CMP		R1,R8			; compara posicao com barreira inferior
+	JGE		output_Y		; Se estiver abaixo do limite inferior
+; verificar posicionamento horizontal
+chk_horizontal:
 	MOV		R3,ncol_def		; para criar um buffer a esquerda
 	SUB		R9,R3			; buffer criado
-	CMP		R2,R9
-	JLE		output_Y	; se esta a esquerda do limite esq. c/buffer		
-	CMP		R2,R10
-	JGT		output_Y	; se esta a direita do limite dir. s/buffer
+	CMP		R2,R9			; compara posicao com barreira esquerda
+	JLE		output_Y		; se esta a esquerda do limite esq. c/buffer		
+	CMP		R2,R10			; compara posicao com barreira direita
+	JGE		output_Y		; se esta a direita do limite dir. s/buffer
 	JMP		output_N		; esta a querer ir para cima da caixa.
 							; nao autorizado.
 
 	JMP		output_Y	; pode mover-se
 	
 output_N:
+; sabemos que o fantasma esta encostado e bloqueado na caixa central
+; verificacao da posicao do fantasma relativamente a barreira
+; hipoteses possiveis: esquerda, direita, cima, baixo
+	;CMP		R1,R7
+
+
 	MOV		R3,move_ok
 	MOV		R4,1			; nao pode mover. tentar linha e coluna.
 	MOV		[R3],R4
