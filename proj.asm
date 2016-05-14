@@ -132,6 +132,8 @@ fant_pos	:	WORD 	0D0FH
 ; posicao de 1 fantasma em cada posicao da tabela
 ; a posicao inicial e a mesma para todos
 
+pac_pos		:	WORD	1A0DH ;posicao do pacman
+
 call_fant	:	WORD	0H	; variavel de chamada da interrupcao
 							; 1 executa, 0 nao executa
 conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao
@@ -151,7 +153,9 @@ keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
 keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
 des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
-move_ok:	WORD	0H ;(0 - ok, 1 - nOK, retry, 2 - bloqueado)
+move_ok:	WORD	0H 	;(0 - ok, 1 - bloqueado, 2 - bloq cima/baixo)
+						;(3 - bloq esquerda/direira) 
+chk_who:	WORD	0H ;(0 - pacman, 1 - fantasma)
 
 ; **********************************************************************
 ; Tabela de vectores de interrupção
@@ -424,6 +428,14 @@ pacman:
 	MOV		[R0],R7		; passar a desenhar
 	
 	CALL 	desenha		; Desenha o pacman na nova posicao
+	PUSH 	R1
+	PUSH	R4
+	MOV		R4,pac_pos	
+	SHL		R1,8
+	ADD		R1,R2
+	MOV		[R4],R1			; coloca a nova pos. do pacman em memoria
+	POP		R4
+	POP		R1
 	MOV		R3,keyb_stt	; Modifica a variavel de estado do teclado para
 	MOV		R5,OFF		; nao indicar que uma tecla premida foi aceite
 	MOV		[R3],R5		; colocando a veriavel a zero
@@ -640,7 +652,19 @@ chk_mv_fant:
 	CMP		R3,0
 	POP		R0
 	JZ		fant_cont	; se tudo correu bem
-	
+	CALL	chk_bloq	; se nao pode mover, verifica a condicao de bloq
+	CMP		R3,1		; se nao estiver diametalmente oposto ao pacman
+	JNZ		chk_mv_fant_retry ; move linha ou coluna
+						; senao passa ao estado 7 ou 8 e fica esperto
+	MOV 	R0,fant_stt
+	MOV		R3,fant_act
+	ADD		R0,R3			; R0 aponta para o estado do fantasma actual
+	MOV		R3,fant_bloq
+	MOVB	[R0],R3			; coloca estado a 7 ou 8 - bloqueado
+							; na proxima iteracao vai para a rotina de
+							; desbloqueio
+
+chk_mv_fant_retry:	
 	MOV		R1,R0		; experimentar a mover so na linha		
 	CALL	check_move	; tenta outra vez
 	PUSH	R0
@@ -659,16 +683,6 @@ chk_mv_fant:
 	POP		R0
 	JZ		fant_cont	
 
-	; esta bloqueado!
-
-	MOV 	R0,fant_stt
-	MOV		R3,fant_act
-	ADD		R0,R3			; R0 aponta para o estado do fantasma actual
-	MOV		R3,fant_bloq
-	MOVB	[R0],R3			; coloca estado a 7 - bloqueado
-							; na proxima iteracao vai para a rotina de
-							; desbloqueio
-	
 fant_cont:
 	MOV		R7,1		; 
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
@@ -1161,11 +1175,10 @@ check_move:
 		
 	; barreira direita
 	MOV		R9,ncol		; apontador do numero de colunas do desenho
-	MOV		R10,[R9]		; numero de linhas do desenho
+	MOV		R10,[R9]	; numero de linhas do desenho
 	ADD		R8,R10		; soma o numero de colunas a 1a col. do desenho
 	CMP		R8,R3
 	JZ		output_N
-
 
 ; verificacao do bloqueio contra a caixa central
 chk_cx:
@@ -1196,30 +1209,67 @@ chk_horizontal:
 	JGE		output_Y		; se esta a direita do limite dir. s/buffer
 	JMP		output_N		; esta a querer ir para cima da caixa.
 							; nao autorizado.
-
-	JMP		output_Y	; pode mover-se
-	
 output_N:
-; sabemos que o fantasma esta encostado e bloqueado na caixa central
-; verificacao da posicao do fantasma relativamente a barreira
-; hipoteses possiveis: esquerda, direita, cima, baixo
-	;CMP		R1,R7
-
-
 	MOV		R3,move_ok
-	MOV		R4,1			; nao pode mover. tentar linha e coluna.
+	MOV		R4,1			; nao pode mover
 	MOV		[R3],R4
-	SUB		R1,R5
+	SUB		R1,R5			; volta linha e coluna original
 	SUB		R2,R6
 	JMP		sai_check_move
 
 output_Y:
 	MOV		R3,move_ok
-	MOV		R4,0			; nao pode mover. tentar linha e coluna.
+	MOV		R4,0			; pode mover
 	MOV		[R3],R4
 	JMP		sai_check_move
 
 sai_check_move:	
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R4
+	POP		R3
+	POP		R0
+	RET
+
+
+; **********************************************************************
+; **********************************************************************
+; CHK BLOQ - verifica onde e que o fantasma esta bloqueado
+; **********************************************************************
+; sabemos que o fantasma esta bloqueado na caixa central
+; verificacao do local de bloqueio
+chk_bloq:
+	PUSH	R0
+	PUSH	R3
+	PUSH	R4
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	CMP		R1,R7
+	JZ		bloq_cima
+	CMP		R1,R8
+	JZ		bloq_baixo
+	CMP		R2,R9
+	JZ		bloq_esq
+	CMP		R2,R10
+	JZ		bloq_dir
+
+bloq_cima:
+bloq_baixo:
+	SUB		R1,R5			; linha fica constante
+	MOV		R0,pac_pos		;
+	MOVB	R3,[R0]			; linha do pacman
+	ADD		R0,1
+	MOVB	R4,[R0]		; coluna do pacman
+	CMP		R2,R4			; compara coluna: fantasma (R2)/pacman (R4)
+			
+bloq_esq:
+bloq_dir:
+	SUB		R2,R6			; coluna fica constante
+
 	POP		R10
 	POP		R9
 	POP		R8

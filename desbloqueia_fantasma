@@ -1,0 +1,112 @@
+	
+; *********************************************************************	
+; DESBLOQUEIA FANTASMA
+; R5 (linha) e R6 (coluna) em que o fantasma se encontra  
+desbloqueia:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH 	R4
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+	MOV		R7,caixa_lin	; R7 = limite superior da caixa
+	MOV		R0,nlin_cx		; numero de linhas da caixa
+	MOV		R8,caixa_lin
+	ADD		R8,R0			; R8 = limite inferior da caixa
+	
+	MOV 	R9,caixa_col	; R9 = limite esquerdo da caixa
+	MOV		R0,ncol_cx		; numero de linhas da caixa
+	SUB		R0,1			; -1
+	MOV		R10,caixa_col
+	ADD		R10,R0			; R10 = limite direito da caixa
+;chk_hor:	
+	MOV		R0,nlin_def		; para criar um buffer em cima
+	SUB		R7,R0			; buffer criado
+	CMP		R5,R7
+	JZ		lim_sup		; se estiver acima do limite sup c/ buffer
+	CMP		R5,R8			; se estiver abaixo, vai ver se esta acima
+							; do limite inferior sem buffer
+	JZ		lim_inf		; Se estiver abaixo do limite inferior
+;chk_ver:
+	MOV		R3,ncol_def		; para criar um buffer a esquerda
+	SUB		R9,R3			; buffer criado
+	CMP		R6,R9
+	JLE		lim_esq	; se esta a esquerda do limite esq. c/buffer		
+	CMP		R6,R10
+	JGT		lim_inf	; se esta a direita do limite dir. s/buffer
+	JMP		output_N		; esta a querer ir para cima da caixa.
+							; nao autorizado.
+							
+lim_sup:
+lim_inf:
+lim_esq:
+lim_dir:
+	CMP		R6,R9
+	JLE		rst_desbloqueia
+	CMP		R6,R10
+	JGT		rst_desbloqueia
+	
+	MOV		R1,R6
+	SUB		R1,R9		; distancia a esquerda
+	MOV		R2,R6
+	SUB		R2,R10		; distancia a direita
+	NEG		R2			; distancia tem que ser positiva
+	CMP		R1,R2		; qual a distancia mais curta?
+	JLE		desloca_esq;
+	JGT		desloca_dir;
+desloca_esq:
+	MOV		R1,-1
+desloca_dir:
+	MOV		R2,1
+
+desloca_hor:
+	MOV		R2,0
+	SWAP	R1,R5
+	SWAP	R2,R6
+	MOV		R7,0			; serve para controlar variavel de estado 
+							; que controla o limpa ou o desenho
+	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
+	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
+						; rotina desenha (0 - limpa, 1 - desenha)
+	MOV		[R0],R7		; poe a variavel de estado de desenha a limpar
+	CALL	desenha		; limpa o desenho actual (apesar de a rotina se 
+						; chamar desenha, se a variavel de estado
+						; des_limp estiver a 0, a rotina apaga)
+
+	ADD		R1,R5		; move-se na direccao do pacman
+	ADD		R2,R6		; move-se na direccao do pacman
+
+	MOV		R7,1		; 
+	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
+	MOV		[R0],R7		; passar a desenhar
+	
+	CALL 	desenha		; Desenha o fantasma na nova posicao
+	
+	SHL		R1,8
+	ADD		R1,R2
+	MOV		[R4],R1		; coloca a nova pos. do fantasma em memoria
+	JMP		rst_desbloqueia
+
+							
+rst_desbloqueia:
+	MOV 	R0,fant_stt
+	MOV		R3,fant_act
+	ADD		R0,R3			; R0 aponta para o estado do fantasma actual
+	MOV		R3,fant_jogo
+	MOVB	[R0],R3	; coloca estado a 6 - em jogo
+
+sai_desbloqueia:	
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	RET
