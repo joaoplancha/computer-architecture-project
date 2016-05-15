@@ -174,7 +174,7 @@ fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
 
-max_fant_def	EQU		3H	;
+max_fant_def	EQU		2H	;
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
 
 fant_andamento	EQU		3H	; andamento do fantasma
@@ -1100,10 +1100,12 @@ sai_escolhe_fantasma:
 	RET
 
 ; **********************************************************************
-; FANT OVERLAP
-; se o fantasma em accao estiver a tocar noutro fantasma, em qualquer
-; uma das direccoes e impedido de se mover
-fant_overlap:
+; PAC OVERLAP
+; detecta quando o pac se sobrepoe a um qualquer fantasma ou a um dos 
+; 4 objectos.
+; R1, linha do pacman
+; R2, coluna do pacman
+pac_overlap:
 	PUSH	R0
 	PUSH	R1
 	PUSH 	R2
@@ -1124,6 +1126,9 @@ fant_overlap:
 	MOV		R0,fant_pos
 	ADD		R0,R1
 	MOV		R3,[R0]			; posicao do fantasma actual
+	
+	MOVB	R5,[R3]			; linha do fantasma
+	MOVB	R6,[R3]			; coluna do fantasma
 	
 
 	
