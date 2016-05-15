@@ -174,7 +174,7 @@ fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
 
-max_fant_def	EQU		2H	;
+max_fant_def	EQU		3H	;
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
 
 fant_andamento	EQU		3H	; andamento do fantasma
@@ -1100,6 +1100,48 @@ sai_escolhe_fantasma:
 	RET
 
 ; **********************************************************************
+; FANT OVERLAP
+; se o fantasma em accao estiver a tocar noutro fantasma, em qualquer
+; uma das direccoes e impedido de se mover
+fant_overlap:
+	PUSH	R0
+	PUSH	R1
+	PUSH 	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+	MOV		R0,fant_act
+	MOV		R1,[R0]
+	MOV		R2,2
+	MUL		R1,R2
+	
+	MOV		R0,fant_pos
+	ADD		R0,R1
+	MOV		R3,[R0]			; posicao do fantasma actual
+	
+
+	
+sai_fant_overlap:
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+
+	RET
+; **********************************************************************
 ; CONTROLO	
 controlo:
 	; restart?
@@ -1279,7 +1321,8 @@ acende_pixel:
 	JMP 	pops
 apaga_pixel:			
 	MOVB	R8,[R1]		; Vai buscar os bits que ja estao acesos
-	SUB		R8,R7
+	NOT		R7
+	AND		R8,R7
 	MOVB	[R1],R8		;acende o bit em questao, deixando inalterado os
 						; bits ja acesos dentro do byte		
 	;pops
