@@ -174,7 +174,7 @@ fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
 
-max_fant_def	EQU		3H	;
+max_fant_def	EQU		2H	;
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
 
 fant_andamento	EQU		3H	; andamento do fantasma
@@ -528,45 +528,7 @@ escolhe:
 	CALL	fant_init
 	JMP		ifs
 	
-; *********************************************************************
-; outputs: R3, R4, R5, R6
-fant_init:	
-	PUSH	R0
-	PUSH	R1				
-	PUSH	R2				
-	PUSH	R7
-	PUSH	R8
-	PUSH	R9
-	PUSH	R10
-	; se a interrupção foi chamada, continua a executar
-	; vamos buscar o estado do fantasma em questao e a sua posicao
-	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
-	MOV		R1,fant_act		; fantasma activo
-	MOV		R2,[R1]			; numero do fantasma activo
-	ADD		R0,R2			; aponta para posicao de estado do fant act	
-	MOVB 	R3,[R0]			; R3 = Estado do fantasma
 	
-	MOV 	R4,fant_pos		; R0 = Apontador para posicao do fantasma
-	MOV		R1,fant_act		; fantasma activo
-	MOV		R2,[R1]			; numero do fantasma activo
-	MOV		R7,2
-	MUL		R2,R7
-	ADD		R4,R2			; aponta para posicao do fant act
-	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
-	ADD		R4,1			; passa a coluna
-	MOVB	R6,[R4]			; R6 = coluna actual do fantasma
-	SUB		R4,1			; volta ao apontador original
-
-sai_fant_init:
-	POP		R10
-	POP		R9
-	POP		R8
-	POP		R7
-	POP		R2
-	POP		R1
-	POP		R0
-	RET 
-; *********************************************************************	
 ifs:
 	CMP		R3,fant_dorme	; Se estiver nao inicializado
 	JZ		sai_fant		; sai sem fazer nada
@@ -646,13 +608,7 @@ saicx_fant:
 	POP		R2
 	POP		R1
 	POP		R0
-	JGT		avisa			; se ja saiu da caixa
 	JMP		rst_fant 		;
-
-avisa:
-;	MOV						; avisa que outro fantasma pode ser acordado
-	JMP		rst_fant
-
 
 move_fant:
 	CALL	GO				;move fantasma e poe nova posicao em memoria
@@ -675,6 +631,48 @@ sai_fant:
 	POP		R1
 	POP		R0
 	RET 
+	
+; *********************************************************************
+; Fant INIT
+; outputs: R3, R4, R5, R6
+fant_init:	
+	PUSH	R0
+	PUSH	R1				
+	PUSH	R2				
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	; se a interrupção foi chamada, continua a executar
+	; vamos buscar o estado do fantasma em questao e a sua posicao
+	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
+	MOV		R1,fant_act		; fantasma activo
+	MOV		R2,[R1]			; numero do fantasma activo
+	ADD		R0,R2			; aponta para posicao de estado do fant act	
+	MOVB 	R3,[R0]			; R3 = Estado do fantasma
+	
+	MOV 	R4,fant_pos		; R0 = Apontador para posicao do fantasma
+	MOV		R1,fant_act		; fantasma activo
+	MOV		R2,[R1]			; numero do fantasma activo
+	MOV		R7,2
+	MUL		R2,R7
+	ADD		R4,R2			; aponta para posicao do fant act
+	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
+	ADD		R4,1			; passa a coluna
+	MOVB	R6,[R4]			; R6 = coluna actual do fantasma
+	SUB		R4,1			; volta ao apontador original
+
+sai_fant_init:
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R2
+	POP		R1
+	POP		R0
+	RET 
+; *********************************************************************	
+
 ; *********************************************************************
 ; *********************************************************************
 GO:
@@ -735,7 +733,7 @@ fant_retry_lin:
 fant_retry_col:
 	MOV		R2,R7		; repoe valor de coluna
 	CALL	check_move	; tenta outra vez
-	MOVB	R3,[R4]
+	MOV 	R3,[R4]
 	CMP		R3,0
 	JNZ		sai_GO
 	CALL	desenha_fant	
@@ -845,6 +843,12 @@ desenha_fant:
 	SHL		R1,8
 	ADD		R1,R2
 	MOV 	R4,fant_pos
+	MOV		R7,fant_act
+	MOV		R8,[R7]
+	MOV		R7,2
+	MUL		R8,R7
+	ADD		R4,R8
+	
 	MOV		[R4],R1		; coloca a nova pos. do fantasma em memoria
 	
 	POP		R10
@@ -877,6 +881,8 @@ desbloqueia:
 	MOV		R9,desbl_cont 	; contador
 	MOV		R1,fant_act		; fantasma actual
 	MOV		R2,[R1]
+	MOV		R1,2
+	MUL		R2,R1
 	ADD		R9,R2
 	MOV		R10,[R9]		; valor do contador
 	AND		R10,R10			; actualizar flags
@@ -892,7 +898,7 @@ desloca:
 	MOV		R9,fant_desbl 
 	MOV		R0,fant_act
 	MOV		R8,[R0]
-	MOV		R10,2
+	MOV		R10,4
 	MUL		R8,R10		; cada fantasma ocupa 2 palavras na tabela
 	ADD		R9,R8		
 	MOV		R3,[R9]		; movimento linha
@@ -906,6 +912,8 @@ desloca:
 	
 	MOV		R9,desbl_cont 
 	MOV		R8,[R0]
+	MOV		R10,2
+	MUL		R8,R10
 	ADD		R9,R8		
 	MOV		R10,[R9]	; numero de iteracoes ate chegar ao fim
 	SUB		R10,1		; menos uma
@@ -936,6 +944,12 @@ sai_desbloqueia:
 
 ; *********************************************************************
 desbl_init:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	
 	MOV		R7,caixa_lin	; R7 = limite superior da caixa
 	MOV		R0,nlin_cx		; numero de linhas da caixa
 	MOV		R8,caixa_lin
@@ -1004,16 +1018,24 @@ desloca_bai:
 sai_desbl_init:
 	MOV		R0,fant_act
 	MOV		R8,[R0]
-	MOV		R9,desbl_cont
+	MOV		R1,2
+	MUL		R8,R1
+	MOV		R9,desbl_cont	; actualizacao do contador de desbloqueio
 	ADD		R9,R8			; para cada fantasma coloca
 	MOV		[R9],R10		; o valor total do deslocamento em memoria
+	
 	MOV		R9,fant_desbl
+	MUL		R8,R1			; para cada fantasma tenho que andar 4 e n 2
 	ADD		R9,R8
 	MOV		[R9],R3			; para cada fantasma
 	ADD		R9,2
 	MOV		[R9],R4		; coloca o deslocamento em memoria 
 							
-	
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
 	
 	RET
 ; *********************************************************************
@@ -1602,7 +1624,7 @@ bloq_dir:
 bloq_total_1:
 	MOV 	R0,fant_stt		; busca apontador para estado dos fantasmas
 	MOV		R3,fant_act		; busca fantasma actual
-	MOV		R4,[R3]
+	MOV 	R4,[R3]
 	ADD		R0,R4			; R0 aponta para o estado do fantasma actual
 	MOV		R3,fant_bloq_1
 	MOVB 	[R0],R3			; coloca estado a 7 bloqueado em cima/baixo
