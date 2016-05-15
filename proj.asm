@@ -107,7 +107,18 @@ obj_L1		EQU	1H
 obj_L2		EQU	1CH
 obj_C1		EQU	2H
 obj_C2		EQU	1BH
+nobj		EQU	4H
 
+
+obj_c_mask:	STRING 	03H,0CH,30H,0C0H
+obj_count:	WORD	0000H;
+obj_c_end:	WORD	00FFH;	
+			
+obj_pos:	WORD 	0102H
+			WORD 	011BH
+			WORD 	1C02H
+			WORD 	1C1BH
+	
 ; **********************************************************************
 ; Fantasmas
 fant_lin		EQU		0DH
@@ -189,6 +200,10 @@ des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
 move_ok:	WORD	0H 	;(0 - ok, 1 - bloqueado, 2 - bloq - panic)
 chk_who:	WORD	0H ;(0 - pacman, 1 - fantasma)
 
+jogo:		WORD	0H	;(0 - em jogo, 1 - terminado)
+emjogo		EQU		0H	;
+terminado 	EQU		1H	;
+
 ; **********************************************************************
 ; Tabela de vectores de interrupção
 tab:		WORD	sig0
@@ -266,6 +281,7 @@ init:
 	
 	
 ciclo:
+	CALL	estado		; ve o estado do jogo
 	CALL	conta		; contagem de tempo
 	CALL	teclado		; Varrimento e leitura das teclas
 	CALL	pacman		; Controlar movimentos do pacman
@@ -277,6 +293,28 @@ ciclo:
 ; **********************************************************************
 ; PROCESSOS
 ; **********************************************************************
+; **********************************************************************
+; ESTADO
+estado:
+	PUSH	R0
+	PUSH	R8
+	PUSH	R9
+	
+	MOV		R0,jogo
+	MOV		R8,[R0]		; estado do jogo colocado em R8
+	MOV		R9,terminado; coloca 1 em R9
+	CMP		R8,R9		; qual o estado do jogo?
+	JLT		sai_estado	; jogo a decorrer
+	POP		R9
+	POP		R8
+	POP		R0
+	CALL	fim_jogo	; termina o jogo
+	
+sai_estado:
+	POP		R9
+	POP		R8
+	POP		R0
+
 ; **********************************************************************
 ; TECLADO
 ; R9: output - valor da tecla pressionada (0-F)
@@ -466,6 +504,7 @@ pacman:
 	MOV		[R0],R7		; passar a desenhar
 	
 	CALL 	desenha		; Desenha o pacman na nova posicao
+	CALL	obj_overlap
 	PUSH 	R1
 	PUSH	R4
 	MOV		R4,pac_pos	
@@ -851,6 +890,8 @@ desenha_fant:
 	
 	MOV		[R4],R1		; coloca a nova pos. do fantasma em memoria
 	
+	CALL	fant_overlap
+	
 	POP		R10
 	POP		R9
 	POP		R8
@@ -1118,20 +1159,42 @@ fant_overlap:
 	PUSH	R9
 	PUSH	R10
 	
-	
-	
-	MOV		R0,fant_act
-	MOV		R1,[R0]
-	MOV		R2,2
-	MUL		R1,R2
-	
+	MOV		R5,fant_emjogo  ; numero de fantasmas em jogo. 
+	MOV		R10,[R5]		; R10=contador
 	MOV		R0,fant_pos
-	ADD		R0,R1
-	MOV		R3,[R0]			; posicao do fantasma actual
 	
-	MOVB	R5,[R3]			; linha do fantasma
-	MOVB	R6,[R3]			; coluna do fantasma
+	MOV		R5,pac_pos
+	MOVB	R1,[R5]
+	ADD		R5,1
+	MOVB	R2,[R5]
+	SUB		R5,1
 	
+	
+fant_ovlp_ciclo1:
+	MOVB	R5,[R0]			; linha do fantasma
+	ADD		R0,1
+	MOVB	R6,[R0]			; coluna do fantasma
+	SUB		R0,1
+	CMP		R5,R1			; estao na mesma linha?
+	JZ		fant_ovlp_ciclo2; se estiverem na mesma linha, verifica col
+	SUB		R10,1			; senao decrementa uma unidade ao contador
+	CMP		R10,0			; chegou ao fim?
+	JZ		sai_fant_overlap; sai e o jogo continua
+	ADD		R0,2			; passa ao fantasma seguinte
+	JMP		fant_ovlp_ciclo1; e salta para o ciclo
+fant_ovlp_ciclo2:
+	CMP		R6,R2			; estao tambem na mesma coluna?
+	JZ		fant_endgame	; se sim, acaba o jogo
+	SUB		R10,1			; senao decrementa uma unidade ao contador
+	CMP		R10,0			; chegou ao fim?
+	JZ		sai_fant_overlap; sai e o jogo continua
+	ADD		R0,2			; passa ao fantasma seguinte
+	JMP		fant_ovlp_ciclo1; e salta para o ciclo
+	
+fant_endgame:
+	MOV		R0,jogo
+	MOV		R1,terminado
+	MOV		[R0],R1
 	
 sai_fant_overlap:
 	POP		R10
@@ -1168,6 +1231,51 @@ obj_overlap:
 	PUSH	R9
 	PUSH	R10
 	
+	MOV		R10,nobj		; numero de objectos em jogo. R10=contador
+	MOV		R0,obj_pos		; posicao dos objectos
+	MOV		R7,R0			; usado para contar numero de obj apanhados
+
+	
+obj_ovlp_ciclo1:
+	MOVB	R5,[R0]			; linha do objecto
+	ADD		R0,1
+	MOVB	R6,[R0]			; coluna do objecto
+	SUB		R0,1
+	CMP		R5,R1			; estao na mesma linha?
+	JZ		obj_ovlp_ciclo2 ; se estiverem na mesma linha, verifica col
+	SUB		R10,1			; senao decrementa uma unidade ao contador
+	CMP		R10,0			; chegou ao fim?
+	JZ		sai_obj_overlap ; sai e o jogo continua
+	ADD		R0,2			; passa ao objecto seguinte
+	JMP		obj_ovlp_ciclo1; e salta para o ciclo
+obj_ovlp_ciclo2:
+	CMP		R6,R2			; estao tambem na mesma coluna?
+	JZ		obj_endgame_test; se sim, acaba o jogo
+	SUB		R10,1			; senao decrementa uma unidade ao contador
+	CMP		R10,0			; chegou ao fim?
+	JZ		sai_obj_overlap ; sai e o jogo continua
+	ADD		R0,2			; passa ao objecto seguinte
+	JMP		obj_ovlp_ciclo1 ; e salta para o ciclo
+obj_endgame_test:
+	SUB		R0,R7
+	MOV		R5,2
+	DIV		R0,R5
+	MOV		R9,obj_c_mask	; busca a mascara
+	ADD		R9,R0			; na posicao certa
+	MOVB	R8,[R9]
+	MOV 	R9,obj_count	; busca o contador de objectos
+	MOVB	R10,[R9]
+	OR		R10,R8
+	MOVB	[R9],R10		; poe a ref do novo objecto apanhado
+	MOV		R7,obj_c_end
+	MOV		R8,[R7]	
+	CMP		R8,R10			; ja foram todos apanhados?
+	JNZ		sai_obj_overlap	; se nao, sai
+	
+obj_endgame:	
+	MOV		R0,jogo
+	MOV		R1,terminado
+	MOV		[R0],R1
 
 sai_obj_overlap:
 	POP		R10
@@ -1237,9 +1345,8 @@ limpa_c:
 	POP		R1
 	POP		R0
 	RET
-;
-;
-;
+
+
 ; **********************************************************************
 ; DESENHA (OU APAGA)
 ; Recebe a localizacao do desenho (canto superior esquerdo)
@@ -1747,6 +1854,12 @@ sai_chk_bloq:
 	POP		R1
 	POP		R0
 	RET
+; **********************************************************************
+; Fim de Jogo
+fim_jogo:
+	CALL	limpa	;limpa o ecra
+	RET
+
 
 ; **********************************************************************
 ; **********************************************************************
