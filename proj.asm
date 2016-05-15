@@ -1200,7 +1200,7 @@ sai_ctrl:
 ; GERADOR
 ; gera um numero entre 0 e 3 
 gerador:
-	RET                     ; isto é para quê?
+	RET
 	PUSH	R0
 	PUSH	R1
 	
