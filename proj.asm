@@ -119,7 +119,7 @@ fant_col		EQU		0FH
 ; 2-5 - na caixa
 ; 6 - no jogo
 
-fant_stt	:	STRING	1H,0H,0H,0H 
+fant_stt	:	STRING	0H,0H,0H,0H 
 ; estado 1 fantasma em cada posicao da string
 ; fantasma0, fantasma1, fantasma2, fantasma3
 
@@ -132,8 +132,21 @@ fant_pos	:	WORD 	0D0FH
 ; posicao de 1 fantasma em cada posicao da tabela
 ; a posicao inicial e a mesma para todos
 
-fant_desbl	:	WORD	0000H ; desbloqueio do fantasma
+;no caso do fantasma estar bloqueado, regista aqui os deslocamentos
+fant_desbl	:
+				;fantasma 0
+				WORD	0000H ; desbloqueio do fantasma
 				WORD	0000H ; 2 WORDS pq ha desloc neg: FFFFH
+				;fantasma 1
+				WORD	0000H ; desbloqueio do fantasma
+				WORD	0000H ; 2 WORDS pq ha desloc neg: FFFFH
+				;fantasma 2
+				WORD	0000H ; desbloqueio do fantasma
+				WORD	0000H ; 2 WORDS pq ha desloc neg: FFFFH
+				;fantasma 3
+				WORD	0000H ; desbloqueio do fantasma
+				WORD	0000H ; 2 WORDS pq ha desloc neg: FFFFH
+
 desbl_cont	:	WORD	0000H ; contadores de desbloqueio
 				WORD	0000H
 				WORD	0000H
@@ -143,9 +156,14 @@ pac_pos		:	WORD	1A0DH ;posicao do pacman
 
 call_fant	:	WORD	0H	; variavel de chamada da interrupcao
 							; 1 executa, 0 nao executa
+
 conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao
 							; 1 conta tempo, 0 nao conta
+next_fant	:	WORD	0H	;variavel de chamada da interrupcao
+							; 1 executa, 0 nao executa
 contador	:	STRING	0H	; guarda a contagem de tempo
+
+ger_cont	:	WORD	0H	; contador para gerador
 
 fant_dorme		EQU		0H
 fant_acorda		EQU		1H
@@ -155,6 +173,11 @@ fant_bloq_1		EQU		7H	; esta bloqueado em cima-baixo
 fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
+
+max_fant_def	EQU		2H	;
+fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
+
+fant_andamento	EQU		3H	; andamento do fantasma
 
 ; variaveis de estado
 ON			EQU	1H
@@ -214,11 +237,17 @@ init:
 	
 	; coloca os fantasmas todos no estado inicial e posicao inicial:
 	MOV		R1,fant_stt
-	MOV		R2,0100H		; estado inicial dos fantasmas
+	MOV		R2,0100H	; estado inicial dos fantasmas
 	MOV		[R1],R2		; guarda estado inicial dos fantasmas em memoria
 	MOV		R1,fant_pos	;
-	MOV		R2,0D0FH	; posicao inicial do fantasma 1
+	MOV		R2,0D0FH	; posicao inicial do fantasma
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 0 em mem
+	ADD		R1,2
 	MOV		[R1],R2		; guarda a posicao inicial do fantasma 1 em mem
+	ADD		R1,2
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 2 em mem
+	ADD		R1,2
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 3 em mem
 	
 	; contador a zero
 	MOV		R3,POUT1	; endereco do Periferico de saida 1
@@ -478,15 +507,33 @@ fantasmas:
 	PUSH	R9
 	PUSH	R10
 	
+	; foi chamada a interrupcao de fantasma?
 	MOV		R0,call_fant
 	MOV		R10,[R0]
 	MOV		R3,0
 	CMP		R10,R3
 	JZ		rst_fant
 	
+	; foi chamado o proximo fantasma?
+	MOV		R0,next_fant
+	MOV		R10,[R0]
+	MOV		R3,0
+	CMP		R10,R3
+	JZ		fant_init
+	CALL	escolhe_fantasma; rotina para escolher o fantasma a actuar
+
+fant_init:	
+	; se a interrupção foi chamada, continua a executar
+	; vamos buscar o estado do fantasma em questao e a sua posicao
 	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
+	MOV		R3,fant_act
+	MOV		R4,[R3]
+	ADD		R0,R4
 	MOVB 	R3,[R0]			; R3 = Estado do fantasma
 	MOV 	R4,fant_pos		; R4 = Apontador para posicao do fantasma
+	MOV		R5,fant_act
+	MOV		R6,[R5]
+	ADD		R4,R6
 	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
 	ADD		R4,1			; passa a coluna
 	MOVB	R6,[R4]			; R6 = coluna actual do fantasma
@@ -797,7 +844,7 @@ desbloqueia:
 	MOV		R2,[R1]
 	ADD		R9,R2
 	MOV		R10,[R9]		; valor do contador
-	AND		R10,R10			;actualizar flags
+	AND		R10,R10			; actualizar flags
 	JNZ		desloca
 	CALL	desbl_init
 	
@@ -810,6 +857,8 @@ desloca:
 	MOV		R9,fant_desbl 
 	MOV		R0,fant_act
 	MOV		R8,[R0]
+	MOV		R10,2
+	MUL		R8,R10		; cada fantasma ocupa 2 palavras na tabela
 	ADD		R9,R8		
 	MOV		R3,[R9]		; movimento linha
 	ADD		R9,2
@@ -933,7 +982,65 @@ sai_desbl_init:
 	
 	RET
 ; *********************************************************************
+; Escolhe Fantasma
+escolhe_fantasma:
+	PUSH	R0
+	PUSH	R1
+	PUSH 	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+	MOV		R4,fant_emjogo	; numero de fantasmas em jogo (1-4)
+	MOV		R2,[R4]			; numero de fantasmas em jogo (1-4)
+	MOV		R5,max_fant_def	; numero maximo de fantasmas admissivel
+	MOV		R0,fant_act
+	MOV		R1,[R0]			; o fantasma actual (0-3)
+	CMP		R5,R2			; ainda nao estao todos em jogo
+	JGT		lanca_fant		; lanca novo fantasma em jogo
+	
+	SUB		R2,1			; para podermos comparar com o fantasma act
+	CMP		R2,R1			; o fantasma activo e o ultimo?
+	JZ		escolhe_fantasma_init
+	ADD		R1,1			; se nao, passa ao seguinte
+	JMP		sai_escolhe_fantasma
 
+lanca_fant:
+	ADD		R2,1
+	MOV		[R4],R2			; aumentou o numero de fantasmas em jogo
+	ADD		R1,1			; passa ao novo fantasma
+	MOV 	R6,fant_stt		; R0 = Apontador para estado do fantasma
+	ADD		R6,R1			; passa ao estado do fantasma actual
+	MOV		R8,fant_acorda
+	MOVB	[R6],R8			; acorda o fantasma.
+	JMP		sai_escolhe_fantasma
+
+escolhe_fantasma_init:
+	MOV		R1,0			; se sim, volta ao primeiro (0)
+	
+sai_escolhe_fantasma:
+	MOV		[R0],R1			; guarda em memoria	o fantasma actual
+	MOV		R0,next_fant
+	MOV		R3,0
+	MOV		[R0],R3			; reset a variavel de estado
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+
+	RET
 
 ; **********************************************************************
 ; CONTROLO	
@@ -950,9 +1057,23 @@ sai_ctrl:
 
 ; **********************************************************************
 ; GERADOR
+; gera um numero entre 0 e 3 
 gerador:
-
+	RET
+	PUSH	R0
+	PUSH	R1
+	
+	MOV		R0,ger_cont		; vai buscar o contador
+	MOV		R1,[R0]			; valor de contador
+	ADD		R1,1			; soma 1 a cada ciclo
+	SHL		R1,14
+	SHR		R1,14			; isola os 2 bits menos significativos
+	MOV		[R0],R1			; coloca em memoria
+	
 sai_ger:
+	POP		R1
+	POP		R0
+
 	RET
 	
 ; **********************************************************************
@@ -1225,6 +1346,9 @@ conta:
 	MOV		R1,contador ; R1 = apontador para contador
 	MOVB	R2,[R1]		; R2 =  o valor actual de contagem em memoria
 	ADD		R2,1		; soma uma unidade ao valor de contagem
+	
+	CALL	fant_gerador; 
+	
 	MOV		R4,R2		;
 	AND		R4,R5		; isola o ultimo nibble
 	CMP		R4,R3		; chegou a A no ultimo nibble?
@@ -1242,7 +1366,6 @@ incr_cont:
 	
 	;se chegou ao 99, recomeça
 	
-
 sai_conta:
 	MOV		R0,conta_tempo
 	MOV		R1,0H
@@ -1253,6 +1376,30 @@ sai_conta:
 	POP		R2
 	POP		R1
 	POP		R0
+	RET
+; **********************************************************************
+; FANT GERADOR - a cada 2 segundos indica a outro fantasma que se mova
+fant_gerador:
+	PUSH 	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	
+	MOV		R4,2
+	MOD		R3,R4			; ve se o valor de contagem de tempo e /3
+	JNZ		sai_fant_gerador; se nao for divisivel por 3, sai
+	MOV		R0,next_fant	; se for, sinaliza para outro fantasma
+	MOV		R1,1			; aparecer em jogo ou se mover
+	MOV		[R0],R1			; coloca a variavel de estado a 1
+	
+sai_fant_gerador:
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	
 	RET
 
 ; **********************************************************************
