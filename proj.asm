@@ -309,6 +309,9 @@ estado:
 	POP		R8
 	POP		R0
 	CALL	fim_jogo	; termina o jogo
+	CALL	teclado
+	CALL	controlo
+	JMP		estado
 	
 sai_estado:
 	POP		R9
@@ -1294,12 +1297,15 @@ sai_obj_overlap:
 ; **********************************************************************
 ; CONTROLO	
 controlo:
-	; restart?
+		; restart
 	MOV		R0,rstrt
 	CMP		R9,R0
 	JNZ		sai_ctrl
 	MOV		SP,fim_pilha; incializa SP
 	MOV		R9,ES0_tec	; Coloca teclado no estado 0
+	MOV		R0,jogo
+	MOV		R9,emjogo
+	MOV		[R0],R9
 	JMP		init
 sai_ctrl:
 	RET
@@ -1627,7 +1633,7 @@ sai_conta:
 	POP		R0
 	RET
 ; **********************************************************************
-; FANT GERADOR - a cada 2 segundos indica a outro fantasma que se mova
+; FANT GERADOR - a cada 3 segundos indica a outro fantasma que se mova
 fant_gerador:
 	PUSH 	R0
 	PUSH	R1
@@ -1635,7 +1641,7 @@ fant_gerador:
 	PUSH	R3
 	PUSH	R4
 	
-	MOV		R4,2
+	MOV		R4,fant_andamento
 	MOD		R3,R4			; ve se o valor de contagem de tempo e /3
 	JNZ		sai_fant_gerador; se nao for divisivel por 3, sai
 	MOV		R0,next_fant	; se for, sinaliza para outro fantasma
