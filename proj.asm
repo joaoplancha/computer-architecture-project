@@ -174,7 +174,7 @@ fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
 
-max_fant_def	EQU		2H	;
+max_fant_def	EQU		3H	;
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
 
 fant_andamento	EQU		3H	; andamento do fantasma
@@ -517,30 +517,57 @@ fantasmas:
 	; foi chamado o proximo fantasma?
 	MOV		R0,next_fant
 	MOV		R10,[R0]
-	MOV		R3,0
+	MOV		R3,1
 	CMP		R10,R3
-	JZ		fant_init
+	JZ		escolhe
+	CALL	fant_init
+	JMP		ifs
+	
+escolhe:
 	CALL	escolhe_fantasma; rotina para escolher o fantasma a actuar
-
+	CALL	fant_init
+	JMP		ifs
+	
+; *********************************************************************
+; outputs: R3, R4, R5, R6
 fant_init:	
+	PUSH	R0
+	PUSH	R1				
+	PUSH	R2				
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
 	; se a interrupção foi chamada, continua a executar
 	; vamos buscar o estado do fantasma em questao e a sua posicao
 	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
-	MOV		R3,fant_act
-	MOV		R4,[R3]
-	ADD		R0,R4
+	MOV		R1,fant_act		; fantasma activo
+	MOV		R2,[R1]			; numero do fantasma activo
+	ADD		R0,R2			; aponta para posicao de estado do fant act	
 	MOVB 	R3,[R0]			; R3 = Estado do fantasma
-	MOV 	R4,fant_pos		; R4 = Apontador para posicao do fantasma
-	MOV		R5,fant_act
-	MOV		R6,[R5]
-	ADD		R4,R6
+	
+	MOV 	R4,fant_pos		; R0 = Apontador para posicao do fantasma
+	MOV		R1,fant_act		; fantasma activo
+	MOV		R2,[R1]			; numero do fantasma activo
+	MOV		R7,2
+	MUL		R2,R7
+	ADD		R4,R2			; aponta para posicao do fant act
 	MOVB 	R5,[R4]			; R5 = linha actual do fantasma
 	ADD		R4,1			; passa a coluna
 	MOVB	R6,[R4]			; R6 = coluna actual do fantasma
 	SUB		R4,1			; volta ao apontador original
 
-
-	; IFs
+sai_fant_init:
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R2
+	POP		R1
+	POP		R0
+	RET 
+; *********************************************************************	
+ifs:
 	CMP		R3,fant_dorme	; Se estiver nao inicializado
 	JZ		sai_fant		; sai sem fazer nada
 
@@ -555,8 +582,7 @@ fant_init:
 	
 	CMP		R3,fant_jogo	; Se estiver bloqueado e diametralmente 
 	JGT		desbloq_fant	; oposto ao pacman (estado 7 ou 8)
-		
-	
+
 desbloq_fant:
 	CALL desbloqueia
 	JMP		rst_fant
@@ -564,17 +590,21 @@ desbloq_fant:
 acorda_fant:
 	PUSH	R1				; preservar linha e coluna do pacman nos
 	PUSH	R2				; registos R1 e R2
+	
 	MOV 	R1,fant_lin		; coloca a linha inicial do fantasma em R1
 	MOV 	R2,fant_col		; coloca a coluna inicial do fantasma em R2
 	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
 	CALL	desenha			; desenha o fantasma com R1, R2 e R8
-	SHL		R1,8
-	ADD		R1,R2
-	MOV		[R4],R1			; coloca a posicao do fantasma em memoria
+	
 	POP		R2
 	POP		R1
 	
-	ADD		R3,1
+	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
+	MOV		R3,fant_act		; fantasma activo
+	MOV		R4,[R3]			; numero do fantasma activo
+	ADD		R0,R4			; aponta para posicao de estado do fant act
+	MOV		R3,2
+	
 	MOVB 	[R0],R3			; actualiza o estado do fantasma
 	JMP		rst_fant 		;
 
@@ -603,14 +633,19 @@ saicx_fant:
 	
 	SHL		R1,8
 	ADD		R1,R2
+	
 	MOV		[R4],R1			; coloca a nova pos. do fantasma em memoria
+	
+	ADD		R3,1
+	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
+	MOV		R1,fant_act		; fantasma activo
+	MOV		R2,[R1]			; numero do fantasma activo
+	ADD		R0,R2			; aponta para posicao de estado do fant act				; 
+	MOVB 	[R0],R3			; actualiza o estado do fantasma
+	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
 	POP		R2
 	POP		R1
 	POP		R0
-
-	ADD		R3,1			; 
-	MOVB 	[R0],R3			; actualiza o estado do fantasma
-	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
 	JGT		avisa			; se ja saiu da caixa
 	JMP		rst_fant 		;
 
