@@ -855,25 +855,21 @@ desbl_init:
 	MOV		R7,caixa_lin	; R7 = limite superior da caixa
 	MOV		R0,nlin_cx		; numero de linhas da caixa
 	MOV		R8,caixa_lin
-	;SUB		R8,1
+	ADD		R8,1
 	ADD		R8,R0			; R8 = limite inferior da caixa
 	
 	MOV 	R9,caixa_col	; R9 = limite esquerdo da caixa
 	MOV		R0,ncol_cx		; numero de linhas da caixa
 	MOV		R10,caixa_col
-	;SUB		R10,1
+	;ADD		R10,1
 	ADD		R10,R0			; R10 = limite direito da caixa
 	
 	MOV		R0,nlin_def		; para criar um buffer em cima
 	SUB		R7,R0			; buffer criado
+	SUB		R7,1
 	MOV		R0,ncol_def		; para criar um buffer a esquerda
 	SUB		R9,R0   		; buffer criado
 
-	;MOV		R0,desbl_cont
-	;MOV		R1,fant_act
-	;MOV		R2,[R1]
-	;ADD		R0,R2			;contador do fantasma em causa
-	
 	MOV		R2,fant_bloq_1	;bloqueado em cima
 	CMP		R2,R3			;e esse o estado?
 	JZ		desloca_hor	
@@ -903,8 +899,8 @@ desloca_dir:
 desloca_ver:
 	MOV		R1,R5
 	SUB		R1,R7		; distancia a cima
-	MOV		R2,R6
-	SUB		R2,R8		; distancia a direita
+	MOV		R2,R5
+	SUB		R2,R8		; distancia a baixo
 	NEG		R2			; distancia tem que ser positiva
 	CMP		R1,R2		; qual a distancia mais curta?
 	JLT		desloca_cim;
