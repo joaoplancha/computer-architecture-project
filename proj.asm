@@ -1100,12 +1100,12 @@ sai_escolhe_fantasma:
 	RET
 
 ; **********************************************************************
-; PAC OVERLAP
-; detecta quando o pac se sobrepoe a um qualquer fantasma ou a um dos 
-; 4 objectos.
+; FANT OVERLAP
+; detecta quando o pac se sobrepoe a um qualquer fantasma.
+; é chamada de cada vez que o pacman ou um dos fant se movem
 ; R1, linha do pacman
 ; R2, coluna do pacman
-pac_overlap:
+fant_overlap:
 	PUSH	R0
 	PUSH	R1
 	PUSH 	R2
@@ -1117,6 +1117,8 @@ pac_overlap:
 	PUSH	R8
 	PUSH	R9
 	PUSH	R10
+	
+	
 	
 	MOV		R0,fant_act
 	MOV		R1,[R0]
@@ -1130,9 +1132,44 @@ pac_overlap:
 	MOVB	R5,[R3]			; linha do fantasma
 	MOVB	R6,[R3]			; coluna do fantasma
 	
-
 	
 sai_fant_overlap:
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+
+	RET
+	
+; **********************************************************************
+; OBJ OVERLAP
+; detecta quando o pac se sobrepoe a um qualquer objecto.
+; é chamada de cada vez que o pacman se move. quando o pacman apanha os
+; 4 objectos, salta para fim de jogo.
+; R1, linha do pacman
+; R2, coluna do pacman
+obj_overlap:
+	PUSH	R0
+	PUSH	R1
+	PUSH 	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+
+sai_obj_overlap:
 	POP		R10
 	POP		R9
 	POP		R8
