@@ -10,6 +10,8 @@
 ; * Pac-Man Simplificado
 ; *		
 ; *	51355 - João Plancha da Silva
+; *	84587 -	Daniel Martins Correia
+; * 84917 	Jaire Silva Marques
 ; *
 ; **********************************************************************
 ; 
@@ -26,6 +28,7 @@ POUT2	EQU	0C000H	; endereço do porto de E do teclado
 POUT3	EQU	06000H	; endereço do porto de E do display extra
 MASK	EQU	10H		; mascara para ver se ja saimos do teclado
 ES0_tec EQU	0FFH	; estado zero do teclado. pode receber novo comando
+key_mask EQU 000FH	; reset do teclado após interrupção de relógio
 
 ON			EQU	1H
 OFF			EQU	0H
@@ -48,6 +51,9 @@ caixa_lin	EQU	0CH		; localizacao do canto superior esquerdo d caixa
 caixa_col	EQU	0DH		; localizacao do canto superior esquerdo d caixa
 barr_NO		EQU	00H
 barr_SE		EQU	20H
+
+print		EQU	1H		; desenha
+clear		EQU	0H		; limpa
 
 ; linhas e colunas dos objectos
 obj_L1		EQU	1H			
@@ -181,7 +187,7 @@ obj_pos:	WORD 	0102H
 ; *********************************************************************
 ; Fantasmas
 ; ----------------------------------------------------------------------
-fant_andamento:	WORD	3H	; andamento do fantasma(periodo em segundos)
+fant_andamento:	WORD	2H	; andamento do fantasma(periodo em segundos)
 ; ----------------------------------------------------------------------
 
 fant_pos	:	WORD 	0D0FH
@@ -377,7 +383,7 @@ update_keyb:
 	MOVB 	R3,[R2]		; Ler do porto de entrada (saida do tecl.)
 						; regista se alguma tecla esta a ser premida
 	PUSH	R1
-	MOV		R1,000FH
+	MOV		R1,key_mask	; reset do teclado após interrupção de relógio
 	AND		R3,R1
 	POP		R1
 	CMP 	R5,R3		; Compara o que leu com o que esta a ler agora
@@ -404,7 +410,7 @@ chk_pressed:			; Verifica se alguma tecla da linha foi premida
 	MOVB 	R3,[R2]		; Ler do porto de entrada (saida do tecl.)
 						; regista se alguma tecla foi premida
 	PUSH	R1
-	MOV		R1,000FH
+	MOV		R1,key_mask	; reset do teclado após interrupção de relógio
 	AND		R3,R1
 	POP		R1
 	AND 	R3,R3		; Afectar as flags (MOVs não afectam as flags)
@@ -497,7 +503,7 @@ pacman:
 	JZ		sai_pac		; sai da rotina sem fazer nada
 	
 	; TODAS AS CONDICOES VERIFICADAS, PODEMOS MOVER O PACMAN
-	MOV		R7,0		; serve para controlar variavel de estado 
+	MOV		R7,clear	; serve para controlar variavel de estado 
 						; que controla o limpa ou o desenho
 	MOV		R8,pac		; coloca o desenho do pacman em R8
 	
@@ -523,13 +529,14 @@ pacman:
 	; verificacao de jogada	
 	CALL	check_move	; chama rotina de verificacao de jogada
 	; fim de verificacao de jogada
-	MOV		R7,1		;  
+	MOV		R7,print	;  
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
 	MOV		[R0],R7		; passar a desenhar
 	
 	CALL 	desenha		; Desenha o pacman na nova posicao
 	CALL	obj_overlap
 	MOV		R9,pac_pos	
+	MOV		R7,R1
 	SHL		R7,8
 	ADD		R7,R2
 	MOV		[R9],R7		; coloca a nova pos. do pacman em memoria
@@ -800,7 +807,7 @@ saidacaixa:
 					
 	MOV		R1,R5
 	MOV		R2,R6
-	MOV		R7,0			; serve para controlar variavel de estado 
+	MOV		R7,clear		; serve para controlar variavel de estado 
 							; que controla o limpa ou o desenho
 	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
 	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
@@ -810,7 +817,7 @@ saidacaixa:
 						; chamar desenha, se a variavel de estado
 						; des_limp estiver a 0, a rotina apaga)
 	SUB		R1,1		; move-se na direccao da saida
-	MOV		R7,1		; 
+	MOV		R7,print		; 
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
 	MOV		[R0],R7		; passar a desenhar
 	
@@ -971,7 +978,7 @@ apaga_fant:
 	PUSH	R9
 	PUSH	R10
 	
-	MOV		R7,0			; serve para controlar variavel de estado 
+	MOV		R7,clear		; serve para controlar variavel de estado 
 							; que controla o limpa ou o desenho
 	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
 	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
@@ -1003,7 +1010,7 @@ desenha_fant:
 	PUSH	R10
 	
 	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
-	MOV		R7,1		; 
+	MOV		R7,print		; 
 	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
 	MOV		[R0],R7		; passar a desenhar
 	
@@ -1050,7 +1057,7 @@ desbloqueia:
 	MOV		R9,desbl_cont 	; contador
 	MOV		R1,fant_act		; fantasma actual
 	MOV		R2,[R1]
-	MOV		R1,2
+	MOV		R1,2			; para multiplicar por 2
 	MUL		R2,R1
 	ADD		R9,R2
 	MOV		R10,[R9]		; valor do contador
@@ -1097,7 +1104,7 @@ rst_desbloqueia:
 	MOV		R4,[R3]
 	ADD		R0,R4			; R0 aponta para o estado do fantasma actual
 	MOV		R3,fant_jogo
-	MOVB	[R0],R3	; coloca estado a 6 - em jogo
+	MOVB	[R0],R3			; coloca estado a 6 - em jogo
 
 sai_desbloqueia:	
 	POP		R10
