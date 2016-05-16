@@ -92,7 +92,7 @@ nok_to_move		EQU		1H
 panic			EQU		2H	; indica que esta totalmente bloqueado
 
 ; ----------------------------------------------------------------------
-max_fant_def	EQU		2H	; numero maximo de fantasmas em jogo
+max_fant_def	EQU		4H	; numero maximo de fantasmas em jogo
 ; ----------------------------------------------------------------------
 
 fant_pos_ini	EQU		0D0FH; posicao inicial do fantasma (para init)
