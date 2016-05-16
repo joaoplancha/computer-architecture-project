@@ -515,10 +515,6 @@ sai_pac:
 	RET
 ; **********************************************************************
 ; FANTASMAS
-; Recebe apontador relativo para o fantasma a actuar
-; guarda-o em R0
-; nao muda R0 ate ao final do ciclo
-; alternativamente substituimos R0 por uma posicao de memoria
 
 fantasmas:
 	PUSH	R0
@@ -534,24 +530,24 @@ fantasmas:
 	PUSH	R10
 	
 	; foi chamada a interrupcao de fantasma?
-	MOV		R0,call_fant
-	MOV		R10,[R0]
+	MOV		R0,call_fant	; verifica variavel de estado accionada por 
+	MOV		R10,[R0]		; interrupcao
 	MOV		R3,0
 	CMP		R10,R3
-	JZ		rst_fant
+	JZ		rst_fant		; se nao foi, sai da rotina
 	
 	; foi chamado o proximo fantasma?
-	MOV		R0,next_fant
-	MOV		R10,[R0]
+	MOV		R0,next_fant	; verifica se o proximo fantasma foi 
+	MOV		R10,[R0]		; chamado via variavel de estado
 	MOV		R3,1
-	CMP		R10,R3
+	CMP		R10,R3			; se sim, vai para escolher fantama
 	JZ		escolhe
 	CALL	fant_init
 	JMP		ifs
 	
 escolhe:
 	CALL	escolhe_fantasma; rotina para escolher o fantasma a actuar
-	CALL	fant_init
+	CALL	fant_init		; inicializacoes do fantasma
 	JMP		ifs
 	
 	
@@ -572,72 +568,20 @@ ifs:
 	JGT		desbloq_fant	; oposto ao pacman (estado 7 ou 8)
 
 desbloq_fant:
-	CALL desbloqueia
+	CALL 	desbloqueia
 	JMP		rst_fant
 
 acorda_fant:
-	PUSH	R1				; preservar linha e coluna do pacman nos
-	PUSH	R2				; registos R1 e R2
-	
-	MOV 	R1,fant_lin		; coloca a linha inicial do fantasma em R1
-	MOV 	R2,fant_col		; coloca a coluna inicial do fantasma em R2
-	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
-	CALL	desenha			; desenha o fantasma com R1, R2 e R8
-	
-	POP		R2
-	POP		R1
-	
-	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
-	MOV		R3,fant_act		; fantasma activo
-	MOV		R4,[R3]			; numero do fantasma activo
-	ADD		R0,R4			; aponta para posicao de estado do fant act
-	MOV		R3,2
-	
-	MOVB 	[R0],R3			; actualiza o estado do fantasma
-	JMP		rst_fant 		;
+	CALL 	acorda
+	JMP		rst_fant
 
 saicx_fant:
-
-	PUSH	R0
-	PUSH	R1				; preservar linha e coluna do pacman nos
-	PUSH	R2				; registos R1 e R2
-	MOV		R1,R5
-	MOV		R2,R6
-	MOV		R7,0			; serve para controlar variavel de estado 
-							; que controla o limpa ou o desenho
-	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
-	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
-						; rotina desenha (0 - limpa, 1 - desenha)
-	MOV		[R0],R7		; poe a variavel de estado de desenha a limpar
-	CALL	desenha		; limpa o desenho actual (apesar de a rotina se 
-						; chamar desenha, se a variavel de estado
-						; des_limp estiver a 0, a rotina apaga)
-	SUB		R1,1		; move-se na direccao da saida
-	MOV		R7,1		; 
-	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
-	MOV		[R0],R7		; passar a desenhar
-	
-	CALL 	desenha		; Desenha o fantasma na nova posicao
-	
-	SHL		R1,8
-	ADD		R1,R2
-	
-	MOV		[R4],R1			; coloca a nova pos. do fantasma em memoria
-	
-	ADD		R3,1
-	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
-	MOV		R1,fant_act		; fantasma activo
-	MOV		R2,[R1]			; numero do fantasma activo
-	ADD		R0,R2			; aponta para posicao de estado do fant act				; 
-	MOVB 	[R0],R3			; actualiza o estado do fantasma
-	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
-	POP		R2
-	POP		R1
-	POP		R0
+	CALL	saidacaixa
 	JMP		rst_fant 		;
 
 move_fant:
 	CALL	GO				;move fantasma e poe nova posicao em memoria
+	JMP		rst_fant 		;
 
 rst_fant:
 	MOV		R0,call_fant
@@ -696,10 +640,95 @@ sai_fant_init:
 	POP		R2
 	POP		R1
 	POP		R0
+	
 	RET 
-; *********************************************************************	
 
 ; *********************************************************************
+; acorda fantasma
+acorda:
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R8				
+	
+	MOV 	R1,fant_lin		; coloca a linha inicial do fantasma em R1
+	MOV 	R2,fant_col		; coloca a coluna inicial do fantasma em R2
+	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
+	CALL	desenha			; desenha o fantasma com R1, R2 e R8
+	
+	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
+	MOV		R3,fant_act		; fantasma activo
+	MOV		R4,[R3]			; numero do fantasma activo
+	ADD		R0,R4			; aponta para posicao de estado do fant act
+	MOV		R3,2
+	
+	MOVB 	[R0],R3			; actualiza o estado do fantasma
+	
+	POP		R8
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	
+	RET
+
+; *********************************************************************
+; sai da caixa
+saidacaixa:
+	PUSH	R0
+	PUSH	R1				
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+					
+	MOV		R1,R5
+	MOV		R2,R6
+	MOV		R7,0			; serve para controlar variavel de estado 
+							; que controla o limpa ou o desenho
+	MOV 	R8,fant		 	; coloca o desenho do fantasma em R8
+	MOV		R0,des_limp	; R0 = aponta para a variavel de estado da
+						; rotina desenha (0 - limpa, 1 - desenha)
+	MOV		[R0],R7		; poe a variavel de estado de desenha a limpar
+	CALL	desenha		; limpa o desenho actual (apesar de a rotina se 
+						; chamar desenha, se a variavel de estado
+						; des_limp estiver a 0, a rotina apaga)
+	SUB		R1,1		; move-se na direccao da saida
+	MOV		R7,1		; 
+	MOV		R0,des_limp	; Altera a variavel de estado de desenha para
+	MOV		[R0],R7		; passar a desenhar
+	
+	CALL 	desenha		; Desenha o fantasma na nova posicao
+	
+	SHL		R1,8
+	ADD		R1,R2
+	
+	MOV		[R4],R1			; coloca a nova pos. do fantasma em memoria
+	
+	ADD		R3,1
+	MOV 	R0,fant_stt		; R0 = Apontador para estado do fantasma
+	MOV		R1,fant_act		; fantasma activo
+	MOV		R2,[R1]			; numero do fantasma activo
+	ADD		R0,R2			; aponta para posicao de estado do fant act				; 
+	MOVB 	[R0],R3			; actualiza o estado do fantasma
+	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
+	
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	
+	RET
+
 ; *********************************************************************
 GO:
 	PUSH	R0
@@ -777,7 +806,9 @@ sai_GO:
 	POP		R2
 	POP		R1
 	POP		R0
+	
 	RET 
+	
 ;**********************************************************************
 fant_calc:
 
@@ -887,8 +918,6 @@ desenha_fant:
 	POP		R0
 	
 	RET	
-;**********************************************************************
-
 	
 ; *********************************************************************	
 ; DESBLOQUEIA FANTASMA
@@ -1066,6 +1095,7 @@ sai_desbl_init:
 	POP		R0
 	
 	RET
+	
 ; *********************************************************************
 ; Escolhe Fantasma
 escolhe_fantasma:
@@ -1285,6 +1315,7 @@ sai_obj_overlap:
 	POP		R0
 
 	RET
+	
 ; **********************************************************************
 ; CONTROLO	
 controlo:
