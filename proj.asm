@@ -41,40 +41,60 @@ leveldown	EQU		0CH			; nivel avaixo (andamento superior)
 ; Desenhos
 base	 	EQU	8000H	; endereço do inicio do pixelScreen
 topo		EQU	8080H	; endereço do fim do pixelScreen
-mask_linha	EQU	0FFFFH	
-mask_colE	EQU	8000H
-mask_colD	EQU	0001H
-caixa_lin	EQU	0CH
-caixa_col	EQU	0DH
+mask_linha	EQU	0FFFFH	; mascara de linha a desenhar no ecra
+mask_colE	EQU	8000H	; mascara para desenhar coluna esquerda
+mask_colD	EQU	0001H	; mascara para desenhar coluna direita
+caixa_lin	EQU	0CH		; localizacao do canto superior esquerdo d caixa
+caixa_col	EQU	0DH		; localizacao do canto superior esquerdo d caixa
+barr_NO		EQU	00H
+barr_SE		EQU	20H
 
 ; linhas e colunas dos objectos
 obj_L1		EQU	1H			
 obj_L2		EQU	1CH
 obj_C1		EQU	2H
 obj_C2		EQU	1BH
-nobj		EQU	4H
+nobj		EQU	4H		; numero de objectos
+
+; aux para desenhos de caixa e pacman
+nlin_cx		EQU	7H				; numero de linhas da caixa
+ncol_cx		EQU	7H				; numero de colunas da caixa
+pac_ini_L	EQU 1AH				; linha inicial do pacman
+pac_ini_C	EQU 0DH				; coluna inicial do pacman
+
+; ---------------------------------------------------------------------
+nlin_def	EQU	3H				; aux para criar buffers na caixa
+ncol_def	EQU	3H				; aux para criar buffers na caixa
+; nota: o numero tem que ser coincidente com o nlin e ncol definidos
+; mais abaixo
+; ---------------------------------------------------------------------
+
 ; **********************************************************************
 ; Fantasmas
-fant_lin		EQU		0DH
-fant_col		EQU		0FH
-fant_dorme		EQU		0H
-fant_acorda		EQU		1H
+fant_lin		EQU		0DH	; linha inicial do fantasma
+fant_col		EQU		0FH	; coluna inicial do fantasma
+fant_dorme		EQU		0H	; estado do fantasma, a dormir, 0
+fant_acorda		EQU		1H	; estado do fantasma, a acordar, 1
 fant_caixa		EQU		5H 	; 2, 3, 4, 5, esta na caixa
-fant_jogo		EQU		6H	; esta em jogo
-fant_bloq_1		EQU		7H	; esta bloqueado em cima-baixo
-fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
+fant_jogo		EQU		6H	; esta em jogo, 6
+fant_bloq_1		EQU		7H	; esta bloqueado em cima/baixo, 7
+fant_bloq_2		EQU		8H	; esta bloqueado a esquerda/direita, 8
 
-panic			EQU		2H	; 
+ok_to_move		EQU		0H
+nok_to_move		EQU		1H
+panic			EQU		2H	; indica que esta totalmente bloqueado
 
-max_fant_def	EQU		2H	;
+; ----------------------------------------------------------------------
+max_fant_def	EQU		2H	; numero maximo de fantasmas em jogo
+; ----------------------------------------------------------------------
 
-fant_pos_ini	EQU		0D0FH;
-fant_stt_ini	EQU		0100H;
+fant_pos_ini	EQU		0D0FH; posicao inicial do fantasma (para init)
+fant_stt_ini	EQU		0100H; estado inicial dos fantasmas (para init)
 
 ; **********************************************************************
 ; estado do jogo
-emjogo		EQU		0H	;
-terminado 	EQU		1H	;
+emjogo		EQU		0H	; indica que esta a decorrer um jogo
+terminado 	EQU		1H	; indica que um jogo terminou (Vitoria=Derrota)
 
 ;
 ;
@@ -90,7 +110,7 @@ fim_pilha:
 ; **********************************************************************
 ; * Dados
 ; **********************************************************************
-PLACE		2600H
+PLACE		2800H
 ; TECLADO
 ; correspondencia de teclas com movimento do pacman
 tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
@@ -126,29 +146,25 @@ tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
 ; DESENHOS
 
 ; tabela de mascaras a usar pela rotina shape_draw:
-; desenhos podem ser modificados
-; tamanho maximo: 7x7
+; desenhos podem ser modificados desde que tenham um
+; tamanho maximo de 7x7
 mascaras:	STRING	80H,40H,20H,10H,08H,04H,02H,01H	
 pac		:	STRING	7H,4H,7H	; desenho do pacman				
 fant	: 	STRING	5H,2H,5H	; desenho do fantasma
 obj		:	STRING 	2H,7H,2H	; desenho do objecto
 caixa	:	STRING	63H,41H,41H,41H,41H,41H,7FH	; desenho da caixa
-nlin	:	WORD	3H
-ncol	:	WORD	3H
 
-nlin_def	EQU	3H
-ncol_def	EQU	3H
-nlin_cx		EQU	7H				; numero de linhas da caixa
-ncol_cx		EQU	7H				; numero de colunas da caixa
-pac_ini_L	EQU 1AH				; linha inicial do pacman
-pac_ini_C	EQU 0DH				; coluna inicial do pacman
-
+; ----------------------------------------------------------------------
+nlin	:	WORD	3H	; numero de linhas e colunas dos desenhos do
+ncol	:	WORD	3H	; pacman fantasmas e objectos.
+; ----------------------------------------------------------------------
 
 ; OUTRAS DEFINICOES E VARIAVEIS DE ESTADO 
 
 ; Pacman
-pac_pos		:	WORD	1A0DH ;posicao do pacman
+pac_pos		:	WORD	1A0DH ; posicao inicial do pacman
 
+; *********************************************************************
 ; Objectos
 obj_c_mask:	STRING 	03H,0CH,30H,0C0H
 obj_count:	WORD	0000H;
@@ -158,11 +174,15 @@ obj_pos:	WORD 	0102H
 			WORD 	011BH
 			WORD 	1C02H
 			WORD 	1C1BH
+; variaveis usadas na rotina de verificacao de sobreposicao entre o
+; pacman e os objectos
+; *********************************************************************
 	
-
+; *********************************************************************
 ; Fantasmas
-
-fant_andamento:	WORD	3H	; andamento do fantasma-periodo em segundos
+; ----------------------------------------------------------------------
+fant_andamento:	WORD	3H	; andamento do fantasma(periodo em segundos)
+; ----------------------------------------------------------------------
 
 fant_pos	:	WORD 	0D0FH
 				WORD 	0D0FH
@@ -171,7 +191,8 @@ fant_pos	:	WORD 	0D0FH
 ; posicao de 1 fantasma em cada posicao da tabela
 ; a posicao inicial e a mesma para todos
 
-;no caso do fantasma estar bloqueado, regista aqui os deslocamentos
+; no caso do fantasma estar bloqueado, regista aqui os deslocamentos
+; necessarios para o desbloquear:
 fant_desbl	:
 				;fantasma 0
 				WORD	0000H ; desbloqueio do fantasma
@@ -187,55 +208,57 @@ fant_desbl	:
 				WORD	0000H ; 2 WORDS pq ha desloc neg: FFFFH
 
 desbl_cont	:	WORD	0000H ; contadores de desbloqueio
-				WORD	0000H
-				WORD	0000H
-				WORD	0000H
+				WORD	0000H ; servem para guardar o numero de
+				WORD	0000H ; iteracoes restantes para o fantasma
+				WORD	0000H ; se desbloquear
+; *********************************************************************
 
-
-
+; *********************************************************************
+; controlo e outros
 contador	:	STRING	0H	; guarda a contagem de tempo
 
 ger_cont	:	WORD	0H	; contador para gerador
 
-
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
+; *********************************************************************
 
-
+; *********************************************************************
+; *********************************************************************
 ; VARIAVEIS DE ESTADO
-keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
+keyb_stt:	WORD	1H 	;(1 - ON, 0 - OFF)
 keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
-des_limp:	WORD	1H ;(1 - desenha, 0 - limpa)
+des_limp:	WORD	1H 	; (1 - desenha, 0 - apaga) rotina de desenho
 move_ok:	WORD	0H 	;(0 - ok, 1 - bloqueado, 2 - bloq - panic)
-chk_who:	WORD	0H ;(0 - pacman, 1 - fantasma)
+chk_who:	WORD	0H	; (0 - pacman, 1 - fantasma)
 
 jogo:		WORD	0H	;(0 - em jogo, 1 - terminado)
 
-
-call_fant	:	WORD	0H	; variavel de chamada da interrupcao
+call_fant	:	WORD	0H	; variavel de chamada da interrupcao que 
+							; executa o movimento dos fantasmas
 							; 1 executa, 0 nao executa
 
-conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao
+conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao que 
+							; executa a contagem de tempo de jogo
 							; 1 conta tempo, 0 nao conta
 							
-next_fant	:	WORD	0H	;variavel de chamada da interrupcao
+next_fant	:	WORD	0H	; variavel de chamada da interrupcao que 
+							; executa a passagem a novo fantasma
 							; 1 executa, 0 nao executa							
 
 ; estado dos fantasmas:
-; 0 - nao inicializados
-; 1 - a inicializar
-; 2-5 - na caixa
-; 6 - no jogo
-
+; 0 - nao inicializados; 1 - a inicializar; 2-5 - na caixa; 6 - no jogo
+; 7 - bloqueado em cima ou em baixo da caixa
+; 8 - bloqueado a esquerda ou a direita da caixa
 fant_stt	:	STRING	0H,0H,0H,0H 
-; estado 1 fantasma em cada posicao da string
+; 1 fantasma em cada posicao da string
 ; fantasma0, fantasma1, fantasma2, fantasma3
 
-fant_act	: 	STRING	0H; fantasma actual
+fant_act	: 	STRING	0H; fantasma actual (varia entre 0 e 3)
 				
-
 ; **********************************************************************
-; Tabela de vectores de interrupção
+; Tabela de vectores de interrupcoes
+; sig0 - contagem de tempo, sig1 - movimento de fantasma
 tab:		WORD	sig0
 			WORD	sig1
 
@@ -279,11 +302,11 @@ init:
 	EI
 	
 ciclo:
-	CALL	estado		; ve o estado do jogo
-	CALL	conta		; contagem de tempo
+	CALL	estado		; Verificacao do estado do jogo
+	CALL	conta		; Contagem de tempo
 	CALL	teclado		; Varrimento e leitura das teclas
 	CALL	pacman		; Controlar movimentos do pacman
-	CALL	fantasmas	; Controlar accoes dos fantasmas
+	CALL	fantasmas	; Controlar movimentos dos fantasmas
 	CALL	controlo	; Tratar das teclas de comecar e terminar
 	CALL	gerador		; Gerar um numero aleatorio
 	JMP		ciclo
@@ -523,6 +546,7 @@ sai_pac:
 	POP		R3
 	POP		R0
 	RET
+	
 ; **********************************************************************
 ; FANTASMAS
 
@@ -612,6 +636,84 @@ sai_fant:
 	POP		R0
 	RET 
 	
+; **********************************************************************
+; CONTROLO	
+controlo:
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+aumenta_nivel:
+	MOV		R0,levelup
+	CMP		R9,R0
+	JNZ		diminui_nivel
+	MOV		R1,fant_andamento
+	MOV		R2,[R1]
+	SUB		R2,1
+	MOV		[R1],R2
+	JMP		sai_ctrl	
+diminui_nivel:
+	MOV		R0,leveldown
+	CMP		R9,R0
+	JNZ		terminar
+	MOV		R1,fant_andamento
+	MOV		R2,[R1]
+	ADD		R2,1
+	MOV		[R1],R2
+	JMP		sai_ctrl
+terminar:
+	MOV		R0,trmnt
+	CMP		R9,R0
+	JNZ		restart
+	MOV		R0,jogo
+	MOV		R9,terminado
+	MOV		[R0],R9
+	CALL	fim_jogo
+restart:
+	MOV		R0,rstrt
+	CMP		R9,R0
+	JNZ		sai_ctrl
+	MOV		SP,fim_pilha; incializa SP
+	MOV		R9,ES0_tec	; Coloca teclado no estado 0
+	MOV		R0,jogo
+	MOV		R9,emjogo
+	MOV		[R0],R9
+	JMP		init
+sai_ctrl:
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+
+	RET
+
+; **********************************************************************
+; GERADOR
+; gera um numero entre 0 e 3 
+gerador:
+	
+	PUSH	R0
+	PUSH	R1
+	
+	MOV		R0,ger_cont		; vai buscar o contador
+	MOV		R1,[R0]			; valor de contador
+	ADD		R1,1			; soma 1 a cada ciclo
+	SHL		R1,14
+	SHR		R1,14			; isola os 2 bits menos significativos
+	MOV		[R0],R1			; coloca em memoria
+	
+sai_ger:
+	POP		R1
+	POP		R0
+
+	RET
+
+; **********************************************************************
+; ROTINAS EXTRA DE FANTASMA
 ; *********************************************************************
 ; Fant INIT
 ; outputs: R3, R4, R5, R6
@@ -1026,7 +1128,6 @@ desbl_init:
 	MOV 	R9,caixa_col	; R9 = limite esquerdo da caixa
 	MOV		R0,ncol_cx		; numero de linhas da caixa
 	MOV		R10,caixa_col
-	;ADD		R10,1
 	ADD		R10,R0			; R10 = limite direito da caixa
 	
 	MOV		R0,nlin_def		; para criar um buffer em cima
@@ -1175,6 +1276,9 @@ sai_escolhe_fantasma:
 	RET
 
 ; **********************************************************************
+; ROTINAS AUXILIARES
+; **********************************************************************
+; **********************************************************************
 ; FANT OVERLAP
 ; detecta quando o pac se sobrepoe a um qualquer fantasma.
 ; é chamada de cada vez que o pacman ou um dos fant se movem
@@ -1200,7 +1304,7 @@ fant_overlap:
 	MOV		R5,pac_pos
 	MOVB	R1,[R5]
 	ADD		R5,1
-	MOVB	R2,[R5]
+	MOVB 	R2,[R5]
 	SUB		R5,1
 	
 	
@@ -1326,85 +1430,7 @@ sai_obj_overlap:
 
 	RET
 	
-; **********************************************************************
-; CONTROLO	
-controlo:
-	PUSH	R1
-	PUSH	R2
-	PUSH	R3
-	PUSH	R4
-	PUSH	R5
-	PUSH	R6
-aumenta_nivel:
-	MOV		R0,levelup
-	CMP		R9,R0
-	JNZ		diminui_nivel
-	MOV		R1,fant_andamento
-	MOV		R2,[R1]
-	SUB		R2,1
-	MOV		[R1],R2
-	JMP		sai_ctrl	
-diminui_nivel:
-	MOV		R0,leveldown
-	CMP		R9,R0
-	JNZ		terminar
-	MOV		R1,fant_andamento
-	MOV		R2,[R1]
-	ADD		R2,1
-	MOV		[R1],R2
-	JMP		sai_ctrl
-terminar:
-	MOV		R0,trmnt
-	CMP		R9,R0
-	JNZ		restart
-	MOV		R0,jogo
-	MOV		R9,terminado
-	MOV		[R0],R9
-	CALL	fim_jogo
-restart:
-	MOV		R0,rstrt
-	CMP		R9,R0
-	JNZ		sai_ctrl
-	MOV		SP,fim_pilha; incializa SP
-	MOV		R9,ES0_tec	; Coloca teclado no estado 0
-	MOV		R0,jogo
-	MOV		R9,emjogo
-	MOV		[R0],R9
-	JMP		init
-sai_ctrl:
-	POP		R6
-	POP		R5
-	POP		R4
-	POP		R3
-	POP		R2
-	POP		R1
-
-	RET
-
-; **********************************************************************
-; GERADOR
-; gera um numero entre 0 e 3 
-gerador:
-	
-	PUSH	R0
-	PUSH	R1
-	
-	MOV		R0,ger_cont		; vai buscar o contador
-	MOV		R1,[R0]			; valor de contador
-	ADD		R1,1			; soma 1 a cada ciclo
-	SHL		R1,14
-	SHR		R1,14			; isola os 2 bits menos significativos
-	MOV		[R0],R1			; coloca em memoria
-	
-sai_ger:
-	POP		R1
-	POP		R0
-
-	RET
-	
-; **********************************************************************
-; ROTINAS AUXILIARES
-; **********************************************************************
+; *********************************************************************
 ; LIMPA ECRA
 limpa:
 	PUSH 	R0
@@ -1828,8 +1854,8 @@ check_move:
 	MOV		R8,R2
 	
 	; perimetro de jogo
-	MOV		R0,0H		; barreira superior/esquerda
-	MOV		R3,20H		; barreira inferior/direita
+	MOV		R0,barr_NO	; barreira superior/esquerda
+	MOV		R3,barr_SE	; barreira inferior/direita
 	
 	; barreira superior
 	CMP		R7,R0
@@ -1884,7 +1910,7 @@ chk_horizontal:
 							; nao autorizado.
 output_N:
 	MOV		R3,move_ok
-	MOV		R4,1			; nao pode mover
+	MOV		R4,nok_to_move		; nao pode mover
 	MOV		[R3],R4
 	SUB		R1,R5			; volta linha e coluna original
 	SUB		R2,R6
@@ -1892,7 +1918,7 @@ output_N:
 
 output_Y:
 	MOV		R3,move_ok
-	MOV		R4,0			; pode mover
+	MOV		R4,ok_to_move			; pode mover
 	MOV		[R3],R4
 	JMP		sai_check_move
 
@@ -1951,7 +1977,6 @@ chk_bloq:
 
 bloq_cima:
 bloq_baixo:
-	;SUB		R1,R5			; linha fica constante
 	MOV		R0,pac_pos		; busca apontador para posicao do pacman
 	MOVB	R3,[R0]			; linha do pacman
 	ADD		R0,1
@@ -1962,7 +1987,6 @@ bloq_baixo:
 
 bloq_esq:
 bloq_dir:
-	;SUB		R2,R6			; coluna fica constante
 	MOV		R0,pac_pos		; busca apontador para posicao do pacman
 	MOVB	R3,[R0]			; linha do pacman
 	CMP		R1,R3			; compara linha: fantasma (R2)/pacman (R4)
@@ -1979,7 +2003,7 @@ bloq_total_1:
 							; na proxima iteracao vai para a rotina de
 							; desbloqueio
 	MOV		R0,move_ok
-	MOV		R3,2
+	MOV		R3,panic		; sinaliza bloqueio
 	MOV 	[R0],R3
 	JMP		sai_chk_bloq
 	
@@ -1993,7 +2017,7 @@ bloq_total_2:
 							; na proxima iteracao vai para a rotina de
 							; desbloqueio
 	MOV		R0,move_ok
-	MOV		R3,2
+	MOV		R3,panic		; sinaliza bloqueio
 	MOV		[R0],R3
 	JMP		sai_chk_bloq
 
@@ -2044,5 +2068,4 @@ sig1:
 	POP		R3
 	POP		R0
 	RFE
-
 
