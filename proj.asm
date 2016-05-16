@@ -15,6 +15,8 @@
 ; 
 ; Inicializacoes
 ;
+; EQU's
+;
 ; TECLADO:
 BUFFER	EQU	100H	; endereço de memória onde se guarda a tecla		
 LINHA	EQU	1		; posição do bit correspondente à linha (1) a testar
@@ -24,6 +26,9 @@ POUT2	EQU	0C000H	; endereço do porto de E do teclado
 POUT3	EQU	06000H	; endereço do porto de E do display extra
 MASK	EQU	10H		; mascara para ver se ja saimos do teclado
 ES0_tec EQU	0FFH	; estado zero do teclado. pode receber novo comando
+
+ON			EQU	1H
+OFF			EQU	0H
 
 
 ; **********************************************************************
@@ -36,7 +41,38 @@ mask_colD	EQU	0001H
 caixa_lin	EQU	0CH
 caixa_col	EQU	0DH
 
+; linhas e colunas dos objectos
+obj_L1		EQU	1H			
+obj_L2		EQU	1CH
+obj_C1		EQU	2H
+obj_C2		EQU	1BH
+nobj		EQU	4H
+; **********************************************************************
+; Fantasmas
+fant_lin		EQU		0DH
+fant_col		EQU		0FH
+fant_dorme		EQU		0H
+fant_acorda		EQU		1H
+fant_caixa		EQU		5H 	; 2, 3, 4, 5, esta na caixa
+fant_jogo		EQU		6H	; esta em jogo
+fant_bloq_1		EQU		7H	; esta bloqueado em cima-baixo
+fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
+panic			EQU		2H	; 
+
+max_fant_def	EQU		3H	;
+
+fant_andamento	EQU		2H	; andamento do fantasma
+
+; **********************************************************************
+; estado do jogo
+emjogo		EQU		0H	;
+terminado 	EQU		1H	;
+
+;
+;
+; DADOS e STACK
+;
 ; **********************************************************************
 ; * Stack 
 ; **********************************************************************
@@ -48,17 +84,7 @@ fim_pilha:
 ; * Dados
 ; **********************************************************************
 PLACE		2600H
-; tabela de mascaras a usar pela rotina shape_draw:
-; desenhos podem ser modificados
-; tamanho maximo: 7x7
-mascaras:	STRING	80H,40H,20H,10H,08H,04H,02H,01H	
-pac		:	STRING	7H,4H,7H	; desenho do pacman				
-fant	: 	STRING	5H,2H,5H	; desenho do fantasma
-obj		:	STRING 	2H,7H,2H	; desenho do objecto
-caixa	:	STRING	63H,41H,41H,41H,41H,41H,7FH	; desenho da caixa
-nlin	:	WORD	3H
-ncol	:	WORD	3H
-
+; TECLADO
 ; correspondencia de teclas com movimento do pacman
 tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
 			WORD	0FFFFH
@@ -94,6 +120,19 @@ tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
 rstrt		EQU		0FH			; reiniciar jogo
 trmnt		EQU		0EH			; terminar jogo
 
+; DESENHOS
+
+; tabela de mascaras a usar pela rotina shape_draw:
+; desenhos podem ser modificados
+; tamanho maximo: 7x7
+mascaras:	STRING	80H,40H,20H,10H,08H,04H,02H,01H	
+pac		:	STRING	7H,4H,7H	; desenho do pacman				
+fant	: 	STRING	5H,2H,5H	; desenho do fantasma
+obj		:	STRING 	2H,7H,2H	; desenho do objecto
+caixa	:	STRING	63H,41H,41H,41H,41H,41H,7FH	; desenho da caixa
+nlin	:	WORD	3H
+ncol	:	WORD	3H
+
 nlin_def	EQU	3H
 ncol_def	EQU	3H
 nlin_cx		EQU	7H				; numero de linhas da caixa
@@ -101,14 +140,13 @@ ncol_cx		EQU	7H				; numero de colunas da caixa
 pac_ini_L	EQU 1AH				; linha inicial do pacman
 pac_ini_C	EQU 0DH				; coluna inicial do pacman
 
-; linhas e colunas dos objectos
-obj_L1		EQU	1H			
-obj_L2		EQU	1CH
-obj_C1		EQU	2H
-obj_C2		EQU	1BH
-nobj		EQU	4H
 
+; OUTRAS DEFINICOES E VARIAVEIS DE ESTADO 
 
+; Pacman
+pac_pos		:	WORD	1A0DH ;posicao do pacman
+
+; Objectos
 obj_c_mask:	STRING 	03H,0CH,30H,0C0H
 obj_count:	WORD	0000H;
 obj_c_end:	WORD	00FFH;	
@@ -118,22 +156,8 @@ obj_pos:	WORD 	0102H
 			WORD 	1C02H
 			WORD 	1C1BH
 	
-; **********************************************************************
+
 ; Fantasmas
-fant_lin		EQU		0DH
-fant_col		EQU		0FH
-
-; estado dos fantasmas:
-; 0 - nao inicializados
-; 1 - a inicializar
-; 2-5 - na caixa
-; 6 - no jogo
-
-fant_stt	:	STRING	0H,0H,0H,0H 
-; estado 1 fantasma em cada posicao da string
-; fantasma0, fantasma1, fantasma2, fantasma3
-
-fant_act	: 	STRING	0H; fantasma actual
 
 fant_pos	:	WORD 	0D0FH
 				WORD 	0D0FH
@@ -162,36 +186,17 @@ desbl_cont	:	WORD	0000H ; contadores de desbloqueio
 				WORD	0000H
 				WORD	0000H
 
-pac_pos		:	WORD	1A0DH ;posicao do pacman
 
-call_fant	:	WORD	0H	; variavel de chamada da interrupcao
-							; 1 executa, 0 nao executa
 
-conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao
-							; 1 conta tempo, 0 nao conta
-next_fant	:	WORD	0H	;variavel de chamada da interrupcao
-							; 1 executa, 0 nao executa
 contador	:	STRING	0H	; guarda a contagem de tempo
 
 ger_cont	:	WORD	0H	; contador para gerador
 
-fant_dorme		EQU		0H
-fant_acorda		EQU		1H
-fant_caixa		EQU		5H 	; 2, 3, 4, 5, esta na caixa
-fant_jogo		EQU		6H	; esta em jogo
-fant_bloq_1		EQU		7H	; esta bloqueado em cima-baixo
-fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
-panic			EQU		2H	; 
-
-max_fant_def	EQU		3H	;
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
 
-fant_andamento	EQU		2H	; andamento do fantasma
 
-; variaveis de estado
-ON			EQU	1H
-OFF			EQU	0H
+; VARIAVEIS DE ESTADO
 keyb_stt:	WORD	1H ;(1 - ON, 0 - OFF)
 keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
@@ -200,8 +205,29 @@ move_ok:	WORD	0H 	;(0 - ok, 1 - bloqueado, 2 - bloq - panic)
 chk_who:	WORD	0H ;(0 - pacman, 1 - fantasma)
 
 jogo:		WORD	0H	;(0 - em jogo, 1 - terminado)
-emjogo		EQU		0H	;
-terminado 	EQU		1H	;
+
+
+call_fant	:	WORD	0H	; variavel de chamada da interrupcao
+							; 1 executa, 0 nao executa
+
+conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao
+							; 1 conta tempo, 0 nao conta
+							
+next_fant	:	WORD	0H	;variavel de chamada da interrupcao
+							; 1 executa, 0 nao executa							
+
+; estado dos fantasmas:
+; 0 - nao inicializados
+; 1 - a inicializar
+; 2-5 - na caixa
+; 6 - no jogo
+
+fant_stt	:	STRING	0H,0H,0H,0H 
+; estado 1 fantasma em cada posicao da string
+; fantasma0, fantasma1, fantasma2, fantasma3
+
+fant_act	: 	STRING	0H; fantasma actual
+				
 
 ; **********************************************************************
 ; Tabela de vectores de interrupção
