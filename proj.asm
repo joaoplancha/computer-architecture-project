@@ -88,8 +88,7 @@ tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
 			WORD	00FFH
 			WORD	00FFH		; D - ND
 			WORD	00FFH
-			WORD	00FFH		; E - ND
-			WORD	00FFH
+
 
 ; teclas de controlo
 rstrt		EQU		0FH			; reiniciar jogo
@@ -185,12 +184,10 @@ fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
 
-max_fant_def	EQU		4H	;
+max_fant_def	EQU		3H	;
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
 
 fant_andamento	EQU		2H	; andamento do fantasma
-
-avisa_fant:		WORD	0H	;
 
 ; variaveis de estado
 ON			EQU	1H
@@ -648,26 +645,12 @@ saicx_fant:
 	MOV		R2,[R1]			; numero do fantasma activo
 	ADD		R0,R2			; aponta para posicao de estado do fant act				; 
 	MOVB 	[R0],R3			; actualiza o estado do fantasma
-	CMP		R3,fant_jogo	; verifica se ainda esta na caixa
-	JNZ		saicx_fant_cont
-	CALL	avisa
-saicx_fant_cont:
+	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
 	POP		R2
 	POP		R1
 	POP		R0
 	JMP		rst_fant 		;
 
-; *********************************************************************
-avisa:	
-	PUSH	R0
-	PUSH	R1
-	MOV		R0,avisa_fant
-	MOV		R1,1
-	MOV		[R0],R1
-	POP		R1
-	POP		R0
-	RET
-; *********************************************************************	
 move_fant:
 	CALL	GO				;move fantasma e poe nova posicao em memoria
 
@@ -1122,15 +1105,9 @@ escolhe_fantasma:
 
 	CMP		R5,R2			; ainda nao estao todos em jogo?
 	JZ		escolhe_cont	; se estiverem continua 
-	MOV		R7,avisa_fant	; senao, ver se e hora de lancar outro fant
-	MOV		R8,[R7]			; verifica se o anterior ja saiu da caixa
-	CMP		R8,0
-	JZ		escolhe_cont	; se nao saiu, continua sem fazer nada
-	MOV		R8,0
-	MOV		[R7],R8			;faz o reset ao aviso de fantasma
-	;MOV		R7,ger_cont		; vai buscar o numero aleatorio
-	;MOV		R9,[R7]
-	;CMP		R9,0			; 25% de probabilidade de acertar
+	MOV		R7,ger_cont		; senao, ver se e hora de lancar outro fant
+	MOV		R9,[R7]
+	CMP		R9,0			; 25% de probabilidade de acertar
 	JZ		lanca_fant		; lanca novo fantasma em jogo
 
 escolhe_cont:	
@@ -1326,7 +1303,16 @@ sai_obj_overlap:
 ; **********************************************************************
 ; CONTROLO	
 controlo:
-		; restart
+	; terminar
+	MOV		R0,trmnt
+	CMP		R9,R0
+	JNZ		restart
+	MOV		R0,jogo
+	MOV		R9,terminado
+	MOV		[R0],R9
+	CALL	fim_jogo
+
+restart:
 	MOV		R0,rstrt
 	CMP		R9,R0
 	JNZ		sai_ctrl
