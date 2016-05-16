@@ -30,6 +30,12 @@ ES0_tec EQU	0FFH	; estado zero do teclado. pode receber novo comando
 ON			EQU	1H
 OFF			EQU	0H
 
+; teclas de controlo
+rstrt		EQU		0FH			; reiniciar jogo
+trmnt		EQU		0EH			; terminar jogo
+levelup		EQU		0DH			; nivel acima (andamento inferior)
+leveldown	EQU		0CH			; nivel avaixo (andamento superior)
+
 
 ; **********************************************************************
 ; Desenhos
@@ -60,9 +66,7 @@ fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
 
-max_fant_def	EQU		3H	;
-
-fant_andamento	EQU		2H	; andamento do fantasma
+max_fant_def	EQU		2H	;
 
 fant_pos_ini	EQU		0D0FH;
 fant_stt_ini	EQU		0100H;
@@ -119,10 +123,6 @@ tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
 			WORD	00FFH
 
 
-; teclas de controlo
-rstrt		EQU		0FH			; reiniciar jogo
-trmnt		EQU		0EH			; terminar jogo
-
 ; DESENHOS
 
 ; tabela de mascaras a usar pela rotina shape_draw:
@@ -161,6 +161,8 @@ obj_pos:	WORD 	0102H
 	
 
 ; Fantasmas
+
+fant_andamento:	WORD	3H	; andamento do fantasma-periodo em segundos
 
 fant_pos	:	WORD 	0D0FH
 				WORD 	0D0FH
@@ -237,6 +239,14 @@ fant_act	: 	STRING	0H; fantasma actual
 tab:		WORD	sig0
 			WORD	sig1
 
+
+; **********************************************************************
+; **********************************************************************
+; **********************************************************************
+;INICIO DO PROGRAMA
+; **********************************************************************
+; **********************************************************************
+; **********************************************************************
 
 PLACE		0H	
 	MOV		SP,fim_pilha; incializa SP
@@ -1319,7 +1329,31 @@ sai_obj_overlap:
 ; **********************************************************************
 ; CONTROLO	
 controlo:
-	; terminar
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+aumenta_nivel:
+	MOV		R0,levelup
+	CMP		R9,R0
+	JNZ		diminui_nivel
+	MOV		R1,fant_andamento
+	MOV		R2,[R1]
+	SUB		R2,1
+	MOV		[R1],R2
+	JMP		sai_ctrl	
+diminui_nivel:
+	MOV		R0,leveldown
+	CMP		R9,R0
+	JNZ		terminar
+	MOV		R1,fant_andamento
+	MOV		R2,[R1]
+	ADD		R2,1
+	MOV		[R1],R2
+	JMP		sai_ctrl
+terminar:
 	MOV		R0,trmnt
 	CMP		R9,R0
 	JNZ		restart
@@ -1338,6 +1372,13 @@ restart:
 	MOV		[R0],R9
 	JMP		init
 sai_ctrl:
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+
 	RET
 
 ; **********************************************************************
@@ -1741,7 +1782,7 @@ sai_conta:
 	POP		R0
 	RET
 ; **********************************************************************
-; FANT GERADOR - a cada 2 segundos indica a outro fantasma que se mova
+; FANT GERADOR - a cada X segundos indica a outro fantasma que se mova
 fant_gerador:
 	PUSH 	R0
 	PUSH	R1
@@ -1750,7 +1791,8 @@ fant_gerador:
 	PUSH	R4
 	
 	MOV		R4,fant_andamento
-	MOD		R2,R4			; 
+	MOV		R3,[R4]
+	MOD		R2,R3			; 
 	JNZ		sai_fant_gerador; 
 	MOV		R0,next_fant	; se for, sinaliza para outro fantasma
 	MOV		R1,1			; aparecer em jogo ou se mover
