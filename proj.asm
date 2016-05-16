@@ -55,12 +55,13 @@ barr_SE		EQU	20H
 print		EQU	1H		; desenha
 clear		EQU	0H		; limpa
 
-; linhas e colunas dos objectos
+; linhas e colunas dos objectos e outros
 obj_L1		EQU	1H			
 obj_L2		EQU	1CH
 obj_C1		EQU	2H
 obj_C2		EQU	1BH
 nobj		EQU	4H		; numero de objectos
+reset_obj_count EQU	0H	; para reset do numero de objectos apanhados
 
 ; aux para desenhos de caixa e pacman
 nlin_cx		EQU	7H				; numero de linhas da caixa
@@ -96,6 +97,12 @@ max_fant_def	EQU		2H	; numero maximo de fantasmas em jogo
 
 fant_pos_ini	EQU		0D0FH; posicao inicial do fantasma (para init)
 fant_stt_ini	EQU		0100H; estado inicial dos fantasmas (para init)
+fant_act_ini	EQU		0H	 ; fantasma actual inicial (para init)
+fant_jogo_ini	EQU		1H	 ; numero de fantasmas em jogo passa a 1
+fant_move_ini	EQU		0H	 ; move_ok para 0
+call_fant_ini	EQU		0H 	 ; call para 0
+next_fant_ini	EQU		0H	 ; next para 0
+desbl_cont_ini	EQU		0000H; desbl_count para 0
 
 ; **********************************************************************
 ; estado do jogo
@@ -236,7 +243,6 @@ keyb_lin:	WORD	1H
 keyb_col:	WORD	1H
 des_limp:	WORD	1H 	; (1 - desenha, 0 - apaga) rotina de desenho
 move_ok:	WORD	0H 	;(0 - ok, 1 - bloqueado, 2 - bloq - panic)
-chk_who:	WORD	0H	; (0 - pacman, 1 - fantasma)
 
 jogo:		WORD	0H	;(0 - em jogo, 1 - terminado)
 
@@ -294,7 +300,7 @@ init:
 	CALL	desenha		;
 	
 	; desenha os objectos na posicao inicial:
-	CALL	desenha_objectos
+	CALL	inicializa_objectos
 	
 	; inicializa fantasmas
 	CALL	inicializa_fantasmas
@@ -646,30 +652,25 @@ sai_fant:
 ; **********************************************************************
 ; CONTROLO	
 controlo:
-	PUSH	R1
-	PUSH	R2
-	PUSH	R3
-	PUSH	R4
-	PUSH	R5
-	PUSH	R6
-aumenta_nivel:
-	MOV		R0,levelup
-	CMP		R9,R0
-	JNZ		diminui_nivel
-	MOV		R1,fant_andamento
-	MOV		R2,[R1]
-	SUB		R2,1
-	MOV		[R1],R2
-	JMP		sai_ctrl	
-diminui_nivel:
-	MOV		R0,leveldown
-	CMP		R9,R0
-	JNZ		terminar
-	MOV		R1,fant_andamento
-	MOV		R2,[R1]
-	ADD		R2,1
-	MOV		[R1],R2
-	JMP		sai_ctrl
+
+;aumenta_nivel:
+;	MOV		R0,levelup
+;	CMP		R9,R0
+;	JNZ		diminui_nivel
+;	MOV		R1,fant_andamento
+;	MOV		R2,[R1]
+;	SUB		R2,1
+;	MOV		[R1],R2
+;	JMP		sai_ctrl	
+;diminui_nivel:
+;	MOV		R0,leveldown
+;	CMP		R9,R0
+;	JNZ		terminar
+;	MOV		R1,fant_andamento
+;	MOV		R2,[R1]
+;	ADD		R2,1
+;	MOV		[R1],R2
+;	JMP		sai_ctrl
 terminar:
 	MOV		R0,trmnt
 	CMP		R9,R0
@@ -685,16 +686,10 @@ restart:
 	MOV		SP,fim_pilha; incializa SP
 	MOV		R9,ES0_tec	; Coloca teclado no estado 0
 	MOV		R0,jogo
-	MOV		R9,emjogo
+	MOV		R9,emjogo	; coloca o estado em jogo
 	MOV		[R0],R9
-	JMP		init
+	JMP		init		; reinicia tudo
 sai_ctrl:
-	POP		R6
-	POP		R5
-	POP		R4
-	POP		R3
-	POP		R2
-	POP		R1
 
 	RET
 
@@ -1682,29 +1677,34 @@ b_d:
 	RET
 	
 ; **********************************************************************
-; DESENHA Objectos
+; Inicializa Objectos
 ; Nao recebe nem retorna argumentos
 ; Desenha os objectos no sitio certo
-desenha_objectos:
+inicializa_objectos:
 	PUSH	R1
 	PUSH	R2
 	PUSH	R8
-	MOV		R1,obj_L1	;
+	MOV		R1,obj_L1	; desenha objecto 1 - canto superior esquerdo
 	MOV		R2,obj_C1	;
 	MOV		R8,obj		;
 	CALL	desenha		;
-	MOV		R1,obj_L1	;
+	MOV		R1,obj_L1	; desenha objecto 2 - canto superior direito
 	MOV		R2,obj_C2	;
 	MOV		R8,obj		;
 	CALL	desenha		;
-	MOV		R1,obj_L2	;
+	MOV		R1,obj_L2	; desenha objecto 3 - canto interior esquerdo
 	MOV		R2,obj_C1	;
 	MOV		R8,obj		;
 	CALL	desenha		;
-	MOV		R1,obj_L2	;
+	MOV		R1,obj_L2	; desenha objecto 4 - canto inferior direito
 	MOV		R2,obj_C2	;
 	MOV		R8,obj		;
 	CALL	desenha		;
+	
+	MOV		R1,obj_count;
+	MOV		R2,reset_obj_count	
+	MOV		[R1],R2		; reset do numero de objectos apanhados
+	
 	POP		R8
 	POP		R2
 	POP		R1
@@ -1733,6 +1733,35 @@ inicializa_fantasmas:
 	ADD		R1,2
 	MOV		[R1],R2		; guarda a posicao inicial do fantasma 3 em mem
 
+	; reset das variaveis de estado ligadas aos fantasmas
+	MOV		R1,fant_act
+	MOV		R2,fant_act_ini	; fantasma actual volta a zero.
+	MOVB	[R1],R2
+	
+	MOV		R1,fant_emjogo	
+	MOV		R2,fant_jogo_ini	; volta a haver so um fantasma em jogo
+	MOV		[R1],R2
+	
+	MOV		R1,move_ok
+	MOV		R2,fant_move_ini	; move em 0 (ok)
+	MOV		[R1],R2
+	MOV		R1,call_fant
+	MOV		R2,call_fant_ini	; call em 0
+	MOV		[R1],R2
+	MOV		R1,next_fant
+	MOV		R2,next_fant_ini	; next fant em 0
+	MOV		[R1],R2
+	
+	MOV		R1,desbl_cont
+	MOV		R2,desbl_cont_ini
+	MOV		[R1],R2				;reset do desbl_count para o fant 0
+	ADD		R1,2
+	MOV		[R1],R2				;reset do desbl_count para o fant 1
+	ADD		R1,2
+	MOV		[R1],R2				;reset do desbl_count para o fant 2
+	ADD		R1,2
+	MOV		[R1],R2				;reset do desbl_count para o fant 3
+	
 	POP	R4
 	POP	R3
 	POP	R2
@@ -1753,6 +1782,11 @@ inicializa_tempo:
 	MOV		[R3],R4		; coloca o valor no display
 	MOV		R3,contador	; R3 = apontador para contador
 	MOV		[R3],R4		; guarda o valor actual de contagem em memoria
+	
+	MOV		R1,conta_tempo
+	MOV		R2,0
+	MOV		[R1],R2
+	
 	POP	R4
 	POP	R3
 	POP	R2
