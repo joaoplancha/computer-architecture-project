@@ -109,6 +109,12 @@ desbl_cont_ini	EQU		0000H; desbl_count para 0
 emjogo		EQU		0H	; indica que esta a decorrer um jogo
 terminado 	EQU		1H	; indica que um jogo terminou (Vitoria=Derrota)
 
+; **********************************************************************
+; contador de tempo
+conta_chk	EQU		0AH		; ver quando chega a 0A - contagem decimal
+conta_msk	EQU		000FH	; isolar periferico
+conta_10	EQU		0A0H	; ver quando chega a A0 - contagem decimal
+
 ;
 ;
 ; DADOS e STACK
@@ -1811,8 +1817,8 @@ conta:
 	AND		R1,R1
 	JZ		sai_conta	; se for zero, sai, se for 1 conta!
 	
-	MOV		R3,0AH		; ver se chegou a XA -> para contagem decimal
-	MOV		R5,000FH	; mascara para isolar o XXXAH
+	MOV		R3,conta_chk; ver se chegou a XA -> para contagem decimal
+	MOV		R5,conta_msk; mascara para isolar o XXXAH
 	MOV		R0,POUT1	; R0 = endereco do Periferico de saida 1
 	MOV		R1,contador ; R1 = apontador para contador
 	MOVB	R2,[R1]		; R2 =  o valor actual de contagem em memoria
@@ -1827,10 +1833,10 @@ conta:
 	ADD		R2,6		; se ja chegou a 10, conta em modo decimal 
 check_A0:	
 	;se chegou ao A0, recomeça do 00
-	MOV		R4,0A0H
+	MOV		R4,conta_10
 	CMP		R2,R4
 	JNZ		incr_cont	; se ainda nao chegou ao A0, conta normalmente
-	MOV		R2,00H		; se ja chegou ao A0, recomeca do 00
+	MOV		R2,0		; se ja chegou ao A0, recomeca do 00
 incr_cont:
 	MOVB	[R0],R2		; coloca no display a contagem actual
 	MOVB	[R1],R2		; coloca na memoria a contagem actual
@@ -1839,7 +1845,7 @@ incr_cont:
 	
 sai_conta:
 	MOV		R0,conta_tempo
-	MOV		R1,0H
+	MOV		R1,0
 	MOV		[R0],R1			; poe a variavel de contagem a zero outra x
 	POP		R5
 	POP		R4
