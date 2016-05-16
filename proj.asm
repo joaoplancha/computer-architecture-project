@@ -64,6 +64,9 @@ max_fant_def	EQU		3H	;
 
 fant_andamento	EQU		2H	; andamento do fantasma
 
+fant_pos_ini	EQU		0D0FH;
+fant_stt_ini	EQU		0100H;
+
 ; **********************************************************************
 ; estado do jogo
 emjogo		EQU		0H	;
@@ -245,7 +248,6 @@ init:
 	CALL	limpa
 	CALL	desenha_ecra; desenha as barreiras
 	
-
 	; desenha o pacman na posicao inicial: 
 	MOV		R1,pac_ini_L;
 	MOV		R2,pac_ini_C;
@@ -253,57 +255,18 @@ init:
 	CALL	desenha		;
 	
 	; desenha os objectos na posicao inicial:
-	PUSH	R1
-	PUSH	R2
-	PUSH	R3
-	PUSH	R4
+	CALL	desenha_objectos
 	
-	MOV		R1,obj_L1	;
-	MOV		R2,obj_C1	;
-	MOV		R8,obj		;
-	CALL	desenha		;
-	MOV		R1,obj_L1	;
-	MOV		R2,obj_C2	;
-	MOV		R8,obj		;
-	CALL	desenha		;
-	MOV		R1,obj_L2	;
-	MOV		R2,obj_C1	;
-	MOV		R8,obj		;
-	CALL	desenha		;
-	MOV		R1,obj_L2	;
-	MOV		R2,obj_C2	;
-	MOV		R8,obj		;
-	CALL	desenha		;
+	; inicializa fantasmas
+	CALL	inicializa_fantasmas
 	
-	; coloca os fantasmas todos no estado inicial e posicao inicial:
-	MOV		R1,fant_stt
-	MOV		R2,0100H	; estado inicial dos fantasmas
-	MOV		[R1],R2		; guarda estado inicial dos fantasmas em memoria
-	MOV		R1,fant_pos	;
-	MOV		R2,0D0FH	; posicao inicial do fantasma
-	MOV		[R1],R2		; guarda a posicao inicial do fantasma 0 em mem
-	ADD		R1,2
-	MOV		[R1],R2		; guarda a posicao inicial do fantasma 1 em mem
-	ADD		R1,2
-	MOV		[R1],R2		; guarda a posicao inicial do fantasma 2 em mem
-	ADD		R1,2
-	MOV		[R1],R2		; guarda a posicao inicial do fantasma 3 em mem
-	
-	; contador a zero
-	MOV		R3,POUT1	; endereco do Periferico de saida 1
-	MOV		R4,0		; comeca a contagem de segundos a zero
-	MOV		[R3],R4		; coloca o valor no display
-	MOV		R3,contador	; R3 = apontador para contador
-	MOV		[R3],R4		; guarda o valor actual de contagem em memoria
-	
-	POP	R4
-	POP	R3
-	POP	R2
-	POP R1
+	; inicializa contador de tempo
+	CALL	inicializa_tempo
+
+	; permite interrupcoes
 	EI0
 	EI1
 	EI
-	
 	
 ciclo:
 	CALL	estado		; ve o estado do jogo
@@ -533,14 +496,10 @@ pacman:
 	
 	CALL 	desenha		; Desenha o pacman na nova posicao
 	CALL	obj_overlap
-	PUSH 	R1
-	PUSH	R4
-	MOV		R4,pac_pos	
-	SHL		R1,8
-	ADD		R1,R2
-	MOV		[R4],R1			; coloca a nova pos. do pacman em memoria
-	POP		R4
-	POP		R1
+	MOV		R9,pac_pos	
+	SHL		R7,8
+	ADD		R7,R2
+	MOV		[R9],R7		; coloca a nova pos. do pacman em memoria
 	MOV		R3,keyb_stt	; Modifica a variavel de estado do teclado para
 	MOV		R5,OFF		; nao indicar que uma tecla premida foi aceite
 	MOV		[R3],R5		; colocando a veriavel a zero
@@ -1337,7 +1296,6 @@ controlo:
 	MOV		R9,terminado
 	MOV		[R0],R9
 	CALL	fim_jogo
-
 restart:
 	MOV		R0,rstrt
 	CMP		R9,R0
@@ -1616,6 +1574,84 @@ b_d:
 	POP		R2
 	POP		R1
 	POP		R0
+	RET
+	
+; **********************************************************************
+; DESENHA Objectos
+; Nao recebe nem retorna argumentos
+; Desenha os objectos no sitio certo
+desenha_objectos:
+	PUSH	R1
+	PUSH	R2
+	PUSH	R8
+	MOV		R1,obj_L1	;
+	MOV		R2,obj_C1	;
+	MOV		R8,obj		;
+	CALL	desenha		;
+	MOV		R1,obj_L1	;
+	MOV		R2,obj_C2	;
+	MOV		R8,obj		;
+	CALL	desenha		;
+	MOV		R1,obj_L2	;
+	MOV		R2,obj_C1	;
+	MOV		R8,obj		;
+	CALL	desenha		;
+	MOV		R1,obj_L2	;
+	MOV		R2,obj_C2	;
+	MOV		R8,obj		;
+	CALL	desenha		;
+	POP		R8
+	POP		R2
+	POP		R1
+	RET
+
+; **********************************************************************
+; Inicializa Fantasmas
+; Nao recebe nem retorna argumentos
+inicializa_fantasmas:
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	
+	; coloca os fantasmas todos no estado inicial e posicao inicial:
+	MOV		R1,fant_stt
+	MOV		R2,fant_stt_ini	; estado inicial dos fantasmas
+	MOV		[R1],R2		; guarda estado inicial dos fantasmas em memoria
+	MOV		R1,fant_pos	;
+	MOV		R2,fant_pos_ini	; posicao inicial do fantasma
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 0 em mem
+	ADD		R1,2
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 1 em mem
+	ADD		R1,2
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 2 em mem
+	ADD		R1,2
+	MOV		[R1],R2		; guarda a posicao inicial do fantasma 3 em mem
+
+	POP	R4
+	POP	R3
+	POP	R2
+	POP R1
+	RET
+
+; **********************************************************************
+; Inicializa Tempo
+; Nao recebe nem retorna argumentos
+inicializa_tempo:	
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	; contador a zero
+	MOV		R3,POUT1	; endereco do Periferico de saida 1
+	MOV		R4,0		; comeca a contagem de segundos a zero
+	MOV		[R3],R4		; coloca o valor no display
+	MOV		R3,contador	; R3 = apontador para contador
+	MOV		[R3],R4		; guarda o valor actual de contagem em memoria
+	POP	R4
+	POP	R3
+	POP	R2
+	POP R1
 	RET
 
 ; **********************************************************************
