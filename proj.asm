@@ -185,10 +185,12 @@ fant_bloq_2		EQU		8H	; esta bloqueado a esquerda-direita
 
 panic			EQU		2H	; 
 
-max_fant_def	EQU		2H	;
+max_fant_def	EQU		4H	;
 fant_emjogo: 	WORD	1H	; numero de fantasmas em jogo (4 = 0 a 3)
 
-fant_andamento	EQU		3H	; andamento do fantasma
+fant_andamento	EQU		2H	; andamento do fantasma
+
+avisa_fant:		WORD	0H	;
 
 ; variaveis de estado
 ON			EQU	1H
@@ -646,12 +648,26 @@ saicx_fant:
 	MOV		R2,[R1]			; numero do fantasma activo
 	ADD		R0,R2			; aponta para posicao de estado do fant act				; 
 	MOVB 	[R0],R3			; actualiza o estado do fantasma
-	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
+	CMP		R3,fant_jogo	; verifica se ainda esta na caixa
+	JNZ		saicx_fant_cont
+	CALL	avisa
+saicx_fant_cont:
 	POP		R2
 	POP		R1
 	POP		R0
 	JMP		rst_fant 		;
 
+; *********************************************************************
+avisa:	
+	PUSH	R0
+	PUSH	R1
+	MOV		R0,avisa_fant
+	MOV		R1,1
+	MOV		[R0],R1
+	POP		R1
+	POP		R0
+	RET
+; *********************************************************************	
 move_fant:
 	CALL	GO				;move fantasma e poe nova posicao em memoria
 
@@ -1102,9 +1118,22 @@ escolhe_fantasma:
 	MOV		R5,max_fant_def	; numero maximo de fantasmas admissivel
 	MOV		R0,fant_act
 	MOV		R1,[R0]			; o fantasma actual (0-3)
-	CMP		R5,R2			; ainda nao estao todos em jogo
-	JGT		lanca_fant		; lanca novo fantasma em jogo
 	
+
+	CMP		R5,R2			; ainda nao estao todos em jogo?
+	JZ		escolhe_cont	; se estiverem continua 
+	MOV		R7,avisa_fant	; senao, ver se e hora de lancar outro fant
+	MOV		R8,[R7]			; verifica se o anterior ja saiu da caixa
+	CMP		R8,0
+	JZ		escolhe_cont	; se nao saiu, continua sem fazer nada
+	MOV		R8,0
+	MOV		[R7],R8			;faz o reset ao aviso de fantasma
+	;MOV		R7,ger_cont		; vai buscar o numero aleatorio
+	;MOV		R9,[R7]
+	;CMP		R9,0			; 25% de probabilidade de acertar
+	JZ		lanca_fant		; lanca novo fantasma em jogo
+
+escolhe_cont:	
 	SUB		R2,1			; para podermos comparar com o fantasma act
 	CMP		R2,R1			; o fantasma activo e o ultimo?
 	JZ		escolhe_fantasma_init
@@ -1314,7 +1343,7 @@ sai_ctrl:
 ; GERADOR
 ; gera um numero entre 0 e 3 
 gerador:
-	RET
+	
 	PUSH	R0
 	PUSH	R1
 	
@@ -1633,7 +1662,7 @@ sai_conta:
 	POP		R0
 	RET
 ; **********************************************************************
-; FANT GERADOR - a cada 3 segundos indica a outro fantasma que se mova
+; FANT GERADOR - a cada 2 segundos indica a outro fantasma que se mova
 fant_gerador:
 	PUSH 	R0
 	PUSH	R1
@@ -1642,8 +1671,8 @@ fant_gerador:
 	PUSH	R4
 	
 	MOV		R4,fant_andamento
-	MOD		R3,R4			; ve se o valor de contagem de tempo e /3
-	JNZ		sai_fant_gerador; se nao for divisivel por 3, sai
+	MOD		R2,R4			; 
+	JNZ		sai_fant_gerador; 
 	MOV		R0,next_fant	; se for, sinaliza para outro fantasma
 	MOV		R1,1			; aparecer em jogo ou se mover
 	MOV		[R0],R1			; coloca a variavel de estado a 1
