@@ -103,7 +103,8 @@ fant_move_ini	EQU		0H	 ; move_ok para 0
 call_fant_ini	EQU		0H 	 ; call para 0
 next_fant_ini	EQU		0H	 ; next para 0
 desbl_cont_ini	EQU		0000H; desbl_count para 0
-
+can_wake_up_y	EQU		1H	 ; fantasma pode acordar
+can_wake_up_n	EQU		0H	 ; fantasma nao pode acordar
 ; **********************************************************************
 ; estado do jogo
 emjogo		EQU		0H	; indica que esta a decorrer um jogo
@@ -123,7 +124,7 @@ conta_10	EQU		0A0H	; ver quando chega a A0 - contagem decimal
 ; * Stack 
 ; **********************************************************************
 PLACE		2000H
-pilha:		TABLE 400H		; espaço reservado para a pilha 
+pilha:		TABLE 300H		; espaço reservado para a pilha 
 fim_pilha:				
 
 ; **********************************************************************
@@ -262,7 +263,9 @@ conta_tempo	:	WORD	0H	; variavel de chamada da interrupcao que
 							
 next_fant	:	WORD	0H	; variavel de chamada da interrupcao que 
 							; executa a passagem a novo fantasma
-							; 1 executa, 0 nao executa							
+							; 1 executa, 0 nao executa			
+							
+can_wake_up	:	WORD	0H	; fantasma ja pode acordar (=1)
 
 ; estado dos fantasmas:
 ; 0 - nao inicializados; 1 - a inicializar; 2-5 - na caixa; 6 - no jogo
@@ -836,7 +839,13 @@ saidacaixa:
 	ADD		R0,R2			; aponta para posicao de estado do fant act				; 
 	MOVB 	[R0],R3			; actualiza o estado do fantasma
 	CMP		R3,fant_caixa	; verifica se ainda esta na caixa
+	JGT		avisa
+	JMP		sai_saidacaixa
 	
+avisa:
+	CALL	avisa_fant
+	
+sai_saidacaixa:
 	POP		R8
 	POP		R7
 	POP		R6
@@ -848,6 +857,21 @@ saidacaixa:
 	POP		R0
 	
 	RET
+
+; *********************************************************************
+avisa_fant:
+	PUSH	R0
+	PUSH	R1				
+	
+	MOV		R0,can_wake_up		; muda a variavel de estado para avisar
+	MOV		R1,can_wake_up_y	; que o proximo fantasma pode acordar
+	MOV		[R0],R1
+			
+sai_avisa_fant:
+	POP		R1
+	POP		R0
+	
+	RET 	
 
 ; *********************************************************************
 GO:
@@ -1235,23 +1259,28 @@ escolhe_fantasma:
 	MOV		R5,max_fant_def	; numero maximo de fantasmas admissivel
 	MOV		R0,fant_act
 	MOV		R1,[R0]			; o fantasma actual (0-3)
-	
 
 	CMP		R5,R2			; ainda nao estao todos em jogo?
-	JZ		escolhe_cont	; se estiverem continua 
+	JZ		escolhe_cont	; se estiverem salta para o proximo 
 	MOV		R7,ger_cont		; senao, ver se e hora de lancar outro fant
 	MOV		R9,[R7]
 	CMP		R9,0			; 25% de probabilidade de acertar
-	JZ		lanca_fant		; lanca novo fantasma em jogo
+	JNZ 	escolhe_cont	; se nao acertou no n aleatorio, salta 
+	MOV		R5,can_wake_up	; se acertou, vamos ver se o fantasma
+	MOV		R7,[R5]			; anterior ja saiu da caixa ou nao
+	CMP		R7,can_wake_up_y; ja saiu? (= 1?)
+	JZ		lanca_fant		; se ja saiu, lanca novo fantasma em jogo
 
 escolhe_cont:	
 	SUB		R2,1			; para podermos comparar com o fantasma act
-	CMP		R2,R1			; o fantasma activo e o ultimo?
+	CMP		R2,R1					; o fantasma activo e o ultimo?
 	JZ		escolhe_fantasma_init
-	ADD		R1,1			; se nao, passa ao seguinte
+	ADD		R1,1					; se nao, passa ao seguinte
 	JMP		sai_escolhe_fantasma
 
 lanca_fant:
+	MOV		R6,can_wake_up_n
+	MOV		[R5],R6			; reset a variavel de estado
 	ADD		R2,1
 	MOV		[R4],R2			; aumentou o numero de fantasmas em jogo
 	ADD		R1,1			; passa ao novo fantasma
@@ -1767,6 +1796,10 @@ inicializa_fantasmas:
 	MOV		[R1],R2				;reset do desbl_count para o fant 2
 	ADD		R1,2
 	MOV		[R1],R2				;reset do desbl_count para o fant 3
+	
+	MOV		R1,can_wake_up
+	MOV		R2,can_wake_up_n	; reset ao can_wake_up
+	MOV		[R1],R2
 	
 	POP	R4
 	POP	R3
