@@ -551,6 +551,8 @@ pacman:
 	
 	CALL 	desenha		; Desenha o pacman na nova posicao
 	CALL	obj_overlap
+	CALL	fant_overlap
+
 	MOV		R9,pac_pos	
 	MOV		R7,R1
 	SHL		R7,8
