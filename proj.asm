@@ -105,6 +105,7 @@ next_fant_ini	EQU		0H	 ; next para 0
 desbl_cont_ini	EQU		0000H; desbl_count para 0
 can_wake_up_y	EQU		1H	 ; fantasma pode acordar
 can_wake_up_n	EQU		0H	 ; fantasma nao pode acordar
+fant_desbl_ini	EQU		0000H
 ; **********************************************************************
 ; estado do jogo
 emjogo		EQU		0H	; indica que esta a decorrer um jogo
@@ -1749,6 +1750,7 @@ inicializa_objectos:
 ; Inicializa Fantasmas
 ; Nao recebe nem retorna argumentos
 inicializa_fantasmas:
+	PUSH	R0
 	PUSH	R1
 	PUSH	R2
 	PUSH	R3
@@ -1801,10 +1803,23 @@ inicializa_fantasmas:
 	MOV		R2,can_wake_up_n	; reset ao can_wake_up
 	MOV		[R1],R2
 	
+	MOV		R4,16				; 4 fantasmas, 2 Words para cada um
+	MOV		R0,2				; para saltar para byte seguinte
+rst_fant_desbl:
+	SUB		R4,R0
+	MOV		R1,fant_desbl
+	MOV		R2,fant_desbl_ini
+	MOV		[R1],R2
+	CMP		R4,0
+	JZ		sai_inicializa_fantasmas
+	JMP		rst_fant_desbl
+	
+sai_inicializa_fantasmas:	
 	POP	R4
 	POP	R3
 	POP	R2
 	POP R1
+	POP	R0
 	RET
 
 ; **********************************************************************
