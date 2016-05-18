@@ -93,6 +93,8 @@ panic			EQU		2H	; indica que esta totalmente bloqueado
 
 ; ----------------------------------------------------------------------
 max_fant_def	EQU		4H	; numero maximo de fantasmas em jogo
+andamento_max	EQU		4H  ; maximo de casas que o fantasma pode andar
+andamento_min	EQU		1H	; minimo de casas que o fantasma pode andar
 ; ----------------------------------------------------------------------
 
 fant_pos_ini	EQU		0D0FH; posicao inicial do fantasma (para init)
@@ -170,10 +172,10 @@ tec_def	:	WORD	0FFFFH		; 0 - cima - esquerda	(-1,-1)
 			WORD	0001H
 			WORD	00FFH		; B - ND
 			WORD	00FFH
-			WORD	00FFH		; C - ND
-			WORD	00FFH
-			WORD	00FFH		; D - ND
-			WORD	00FFH
+			WORD	0000H		; C - ND
+			WORD	0000H
+			WORD	0000H		; D - ND
+			WORD	0000H
 
 
 ; DESENHOS
@@ -492,7 +494,6 @@ conv_key:				;
 rst_estd:
 	MOV		R9,ES0_tec	; R9 = estado 0
 	JMP		sai_tec
-
 sai_tec:
 	POP		R10
 	POP		R8
@@ -505,7 +506,7 @@ sai_tec:
 	POP		R1
 	POP		R0
 	RET
-
+	
 ; **********************************************************************
 ; PACMAN
 ; usa tecla recebida atraves do registo R9
@@ -675,28 +676,22 @@ sai_fant:
 	POP		R0
 	RET 
 	
+
+
 ; **********************************************************************
 ; CONTROLO	
 controlo:
 	CALL	mostra_andamento
-;aumenta_nivel:
-;	MOV		R0,levelup
-;	CMP		R9,R0
-;	JNZ		diminui_nivel
-;	MOV		R1,fant_andamento
-;	MOV		R2,[R1]
-;	SUB		R2,1
-;	MOV		[R1],R2
-;	JMP		sai_ctrl	
-;diminui_nivel:
-;	MOV		R0,leveldown
-;	CMP		R9,R0
-;	JNZ		terminar
-;	MOV		R1,fant_andamento
-;	MOV		R2,[R1]
-;	ADD		R2,1
-;	MOV		[R1],R2
-;	JMP		sai_ctrl
+aumenta_andamento:
+	MOV		R0,levelup
+	CMP		R9,R0
+	JNZ		diminui_andamento
+	CALL	aumenta_andamento2
+diminui_andamento:
+	MOV		R0,leveldown
+	CMP		R9,R0
+	JNZ		terminar
+	CALL	diminui_andamento2
 terminar:
 	MOV		R0,trmnt
 	CMP		R9,R0
@@ -746,6 +741,56 @@ sai_ger:
 	POP		R0
 
 	RET
+
+; **********************************************************************
+; AUMENTA ANDAMENTO DOS FANTASMAS QUANDO A TECLA "D" E PREMIDA	
+aumenta_andamento2:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R9
+	
+	MOV		R1,fant_andamento
+	MOV		R2,[R1]
+	MOV		R3,andamento_max
+	CMP		R2,R3
+	JGE		sai_aumenta_andamento2
+	ADD		R2,1
+	MOV		[R1],R2
+	
+sai_aumenta_andamento2:
+	POP		R9
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	RET
+	
+; **********************************************************************
+; DIMINUI ANDAMENTO DOS FANTASMAS QUANDO A TECLA "C" E PREMIDA	
+diminui_andamento2:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R9
+
+	MOV		R1,fant_andamento
+	MOV		R2,[R1]
+	MOV		R3,andamento_min
+	CMP		R2,R3
+	JLE		sai_diminui_andamento2
+	SUB		R2,1
+	MOV		[R1],R2
+	
+sai_diminui_andamento2:
+	POP		R9
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	RET	
 
 ; **********************************************************************
 ; ROTINAS EXTRA DE FANTASMA
