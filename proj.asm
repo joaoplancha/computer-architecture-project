@@ -106,6 +106,18 @@ desbl_cont_ini	EQU		0000H; desbl_count para 0
 can_wake_up_y	EQU		1H	 ; fantasma pode acordar
 can_wake_up_n	EQU		0H	 ; fantasma nao pode acordar
 fant_desbl_ini	EQU		0000H
+rst_fant_desbl_aux EQU	10H	; 16
+
+sai				EQU		0H	 ; pode sair da caixa
+nao_sai			EQU		1H	 ; nao pode sair da caixa
+
+; ----------------------------------------------------------------------
+cx_porta_lin EQU 09H	; localicazao da linha da porta com buffer
+cx_porta_col EQU 0FH	; localizacao da coluna da porta
+; Nota: deve ser alterado se o tamanho dos fantasmas se alterar. Nesse 
+; caso, a dimensao da porta no desenho tambem deve ser revisto 
+; ----------------------------------------------------------------------
+
 ; **********************************************************************
 ; estado do jogo
 emjogo		EQU		0H	; indica que esta a decorrer um jogo
@@ -267,6 +279,8 @@ next_fant	:	WORD	0H	; variavel de chamada da interrupcao que
 							; 1 executa, 0 nao executa			
 							
 can_wake_up	:	WORD	0H	; fantasma ja pode acordar (=1)
+
+pode_sair	:	WORD	0H	; fantama pode sair da caixa (1) ou nao (0)
 
 ; estado dos fantasmas:
 ; 0 - nao inicializados; 1 - a inicializar; 2-5 - na caixa; 6 - no jogo
@@ -687,6 +701,9 @@ terminar:
 	MOV		R0,trmnt
 	CMP		R9,R0
 	JNZ		restart
+	DI0
+	DI1
+	DI
 	MOV		R0,jogo
 	MOV		R9,terminado
 	MOV		[R0],R9
@@ -695,11 +712,15 @@ restart:
 	MOV		R0,rstrt
 	CMP		R9,R0
 	JNZ		sai_ctrl
+	DI0
+	DI1
+	DI
 	MOV		SP,fim_pilha; incializa SP
 	MOV		R9,ES0_tec	; Coloca teclado no estado 0
 	MOV		R0,jogo
 	MOV		R9,emjogo	; coloca o estado em jogo
 	MOV		[R0],R9
+	
 	JMP		init		; reinicia tudo
 sai_ctrl:
 
@@ -811,6 +832,17 @@ saidacaixa:
 	PUSH	R6
 	PUSH	R7
 	PUSH	R8
+	
+	; primeiro verifica se pode mesmo sair da caixa, ou se existe um 
+	; fantasma a bloquear o seu progresso
+	CALL	fant_abloquear	; chama a rotina que verifica se pode
+							; sair da caixa
+	MOV		R1,pode_sair	; busca variável de estado
+	MOV		R2,[R1]
+	MOV		R7,nao_sai		;
+	CMP		R2,R7			; pode sair?
+	JZ		sai_saidacaixa	; se nao puder (pode_sair=1), sai da rotina
+							; caso contrario, continua
 					
 	MOV		R1,R5
 	MOV		R2,R6
@@ -849,6 +881,9 @@ avisa:
 	CALL	avisa_fant
 	
 sai_saidacaixa:
+	MOV		R1,pode_sair	; busca variável de estado
+	MOV		R5,sai			
+	MOV		[R1],R5			; faz reset
 	POP		R8
 	POP		R7
 	POP		R6
@@ -1470,6 +1505,74 @@ sai_obj_overlap:
 
 	RET
 	
+; **********************************************************************
+; FANT ABLOQUEAR
+; detecta quando fantasma quer sair da caixa mas esta outro a bloquear
+; a porta da caixa
+fant_abloquear:
+	PUSH	R0
+	PUSH	R1
+	PUSH 	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+	MOV		R5,fant_emjogo  ; numero de fantasmas em jogo. 
+	MOV		R10,[R5]		; R10=contador
+	SUB		R10,1			; menos um porque senao ia verificar-se a
+	CMP		R10,0			; se for o unico em jogo
+	JZ		sai_fant_abloquear; sai da rotina sem fazer nada
+	MOV		R0,fant_pos		; ele proprio
+	
+	MOV		R1,cx_porta_lin ; 9 (com buffer)
+	MOV		R2,cx_porta_col ; F
+		
+fant_abloquear_ciclo1:
+	MOVB	R5,[R0]			; linha do fantasma
+	ADD		R0,1
+	MOVB	R6,[R0]			; coluna do fantasma
+	SUB		R0,1
+	CMP		R5,R1			; estao na mesma linha?
+	JZ		fant_abloquear_ciclo2; se estiverem na mesma linha, verifica col
+	SUB		R10,1			; senao decrementa uma unidade ao contador
+	CMP		R10,0			; chegou ao fim?
+	JZ		sai_fant_abloquear; sai e o jogo continua
+	ADD		R0,2			; passa ao fantasma seguinte
+	JMP		fant_abloquear_ciclo1; e salta para o ciclo
+fant_abloquear_ciclo2:
+	CMP		R6,R2			; estao tambem na mesma coluna?
+	JZ		fant_abloq	; se sim, acaba o jogo
+	SUB		R10,1			; senao decrementa uma unidade ao contador
+	CMP		R10,0			; chegou ao fim?
+	JZ		sai_fant_abloquear; sai e o jogo continua
+	ADD		R0,2			; passa ao fantasma seguinte
+	JMP		fant_abloquear_ciclo1; e salta para o ciclo
+	
+fant_abloq:
+	MOV		R0,pode_sair
+	MOV		R1,nao_sai
+	MOV		[R0],R1
+	
+sai_fant_abloquear:
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+
+	RET	
+	
 ; *********************************************************************
 ; LIMPA ECRA
 limpa:
@@ -1805,15 +1908,20 @@ inicializa_fantasmas:
 	MOV		R2,can_wake_up_n	; reset ao can_wake_up
 	MOV		[R1],R2
 	
-	MOV		R4,16				; 4 fantasmas, 2 Words para cada um
+	MOV		R1,pode_sair
+	MOV		R2,sai				; reset ao pode_sair
+	MOV		[R1],R2
+	
+	MOV		R4,rst_fant_desbl_aux; 4 fantasmas, 2 Words para cada um
 	MOV		R0,2				; para saltar para byte seguinte
-rst_fant_desbl:
-	SUB		R4,R0
 	MOV		R1,fant_desbl
 	MOV		R2,fant_desbl_ini
+rst_fant_desbl:
+	SUB		R4,R0
 	MOV		[R1],R2
 	CMP		R4,0
 	JZ		sai_inicializa_fantasmas
+	ADD		R1,R0
 	JMP		rst_fant_desbl
 	
 sai_inicializa_fantasmas:	
