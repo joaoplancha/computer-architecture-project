@@ -678,7 +678,7 @@ sai_fant:
 ; **********************************************************************
 ; CONTROLO	
 controlo:
-
+	CALL	mostra_andamento
 ;aumenta_nivel:
 ;	MOV		R0,levelup
 ;	CMP		R9,R0
@@ -2015,7 +2015,50 @@ sai_conta:
 	POP		R0
 	RET
 	
-; **********************************************************************
+; *********************************************************************
+; MOSTRA ANDAMENTO DOS FANTASMAS E NUMERO DE FANTASMAS NO JOGO
+mostra_andamento:
+	PUSH	R0
+	PUSH	R1
+	PUSH	R2
+	PUSH	R3
+	PUSH	R4
+	PUSH	R5
+	PUSH	R6
+	PUSH	R7
+	PUSH	R8
+	PUSH	R9
+	PUSH	R10
+	
+	MOV		R0,fant_andamento
+	MOV		R1,[R0]				; andamento dos fantasmas - numero de 
+								; casas que andam de cada vez
+	
+	MOV		R0,fant_emjogo
+	MOV		R2,[R0]				; numero de fantasmas em jogo
+	
+	SHL		R1,4				; este valor passa ao nibble seguinte
+	OR		R1,R2				; somam-se os dois valores, para 
+								; apresentar em cada display de 7
+								; segmentos extra (POUT3)
+	MOV		R0,POUT3			; R0 = endereco do Periferico de saida 3
+	MOVB	[R0],R1				; coloca os valores em causa no display
+	
+sai_mostra_andamento:	
+	POP		R10
+	POP		R9
+	POP		R8
+	POP		R7
+	POP		R6
+	POP		R5
+	POP		R4
+	POP		R3
+	POP		R2
+	POP		R1
+	POP		R0
+	RET
+	
+; *********************************************************************
 ; FANT GERADOR - a cada X segundos indica a outro fantasma que se mova
 fant_gerador:
 	PUSH 	R0
