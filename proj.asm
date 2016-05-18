@@ -1878,7 +1878,7 @@ inicializa_fantasmas:
 	; reset das variaveis de estado ligadas aos fantasmas
 	MOV		R1,fant_act
 	MOV		R2,fant_act_ini	; fantasma actual volta a zero.
-	MOVB	[R1],R2
+	MOV		[R1],R2
 	
 	MOV		R1,fant_emjogo	
 	MOV		R2,fant_jogo_ini	; volta a haver so um fantasma em jogo
