@@ -681,17 +681,19 @@ sai_fant:
 ; **********************************************************************
 ; CONTROLO	
 controlo:
-	CALL	mostra_andamento
+
 aumenta_andamento:
 	MOV		R0,levelup
 	CMP		R9,R0
 	JNZ		diminui_andamento
 	CALL	aumenta_andamento2
+	CALL	mostra_andamento
 diminui_andamento:
 	MOV		R0,leveldown
 	CMP		R9,R0
 	JNZ		terminar
 	CALL	diminui_andamento2
+	CALL	mostra_andamento
 terminar:
 	MOV		R0,trmnt
 	CMP		R9,R0
@@ -1371,6 +1373,7 @@ lanca_fant:
 	ADD		R6,R1			; passa ao estado do fantasma actual
 	MOV		R8,fant_acorda
 	MOVB	[R6],R8			; acorda o fantasma.
+	CALL	mostra_andamento
 	JMP		sai_escolhe_fantasma
 
 escolhe_fantasma_init:
