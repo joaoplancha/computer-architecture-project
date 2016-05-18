@@ -1994,7 +1994,9 @@ check_A0:
 	MOV		R4,conta_10
 	CMP		R2,R4
 	JNZ		incr_cont	; se ainda nao chegou ao A0, conta normalmente
-	MOV		R2,0		; se ja chegou ao A0, recomeca do 00
+	;MOV		R2,0		; se ja chegou ao A0, recomeca do 00		
+	SUB		R2,7		; se ja chegou ao A0, volta 7 atras, e
+						; fica ai. (99 e o maximo) se fizesse -1 dava 9F
 incr_cont:
 	MOVB	[R0],R2		; coloca no display a contagem actual
 	MOVB	[R1],R2		; coloca na memoria a contagem actual
@@ -2012,6 +2014,7 @@ sai_conta:
 	POP		R1
 	POP		R0
 	RET
+	
 ; **********************************************************************
 ; FANT GERADOR - a cada X segundos indica a outro fantasma que se mova
 fant_gerador:
